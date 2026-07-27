@@ -15,21 +15,38 @@ public static class StartupService
         return key?.GetValue(ValueName) is not null;
     }
 
-    public static void SetEnabled(bool enabled)
+    /// <summary>Returns false if the registry write didn't go through (e.g. ProcessPath unavailable,
+    /// or the key couldn't be opened) - the caller should tell the user, since the app's global
+    /// DispatcherUnhandledException handler would otherwise swallow a thrown exception here with
+    /// no visible sign that the checkbox didn't actually take effect.</summary>
+    public static bool SetEnabled(bool enabled)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath);
-
-        if (enabled)
+        try
         {
-            var exePath = Environment.ProcessPath;
-            if (!string.IsNullOrEmpty(exePath))
+            using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath);
+
+            if (enabled)
             {
+                var exePath = Environment.ProcessPath;
+                if (string.IsNullOrEmpty(exePath))
+                {
+                    DebugLog.Write("StartupService.SetEnabled(true): Environment.ProcessPath was null/empty.");
+                    return false;
+                }
+
                 key.SetValue(ValueName, $"\"{exePath}\"");
             }
+            else
+            {
+                key.DeleteValue(ValueName, throwOnMissingValue: false);
+            }
+
+            return true;
         }
-        else
+        catch (Exception ex)
         {
-            key.DeleteValue(ValueName, throwOnMissingValue: false);
+            DebugLog.Write($"StartupService.SetEnabled({enabled}) failed: {ex}");
+            return false;
         }
     }
 }

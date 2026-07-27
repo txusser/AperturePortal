@@ -36,7 +36,12 @@ public partial class SettingsWindow : Window
         settings.LaunchInConsoleMode = LaunchConsoleModeCheckBox.IsChecked == true;
         _settingsService.Save(settings);
 
-        StartupService.SetEnabled(StartWithWindowsCheckBox.IsChecked == true);
+        if (!StartupService.SetEnabled(StartWithWindowsCheckBox.IsChecked == true))
+        {
+            MessageBox.Show(this,
+                "Couldn't update the \"Start with Windows\" setting - see %APPDATA%\\ApertureOS\\error.log for details.",
+                "Aperture Portal", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
 
         DialogResult = true;
         Close();
