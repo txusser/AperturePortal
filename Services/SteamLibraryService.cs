@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -104,6 +105,93 @@ public sealed class SteamLibraryService
 
         return ParseOwnedGames(await response.Content.ReadAsStringAsync(ct));
     }
+
+    /// <summary>
+    /// Games other members of the user's Steam Family share with them, installed or not - the part
+    /// GetOwnedGames never returns, since those licenses belong to someone else. Uses the same
+    /// undocumented service the Steam client/store use for the family library
+    /// (IFamilyGroupsService: GetFamilyGroupForUser -> GetSharedLibraryApps), authenticated with the
+    /// same embedded-browser session token as <see cref="GetOwnedGamesViaSessionAsync"/>. Returns an
+    /// empty list if the account isn't in a family. Undocumented means Valve can change it without
+    /// notice, so callers should treat failures as "no family games", not as a failed sync.
+    /// </summary>
+    public async Task<List<SteamAppInfo>> GetFamilySharedGamesViaSessionAsync(
+        string steamLoginSecureCookie, CancellationToken ct = default)
+    {
+        var accessToken = Uri.EscapeDataString(ExtractAccessToken(steamLoginSecureCookie));
+
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.TryAddWithoutValidation("Origin", "https://store.steampowered.com");
+        http.DefaultRequestHeaders.Referrer = new Uri("https://store.steampowered.com/");
+
+        var groupJson = await GetFamilyApiJsonAsync(http,
+            $"https://api.steampowered.com/IFamilyGroupsService/GetFamilyGroupForUser/v1/?access_token={accessToken}", ct);
+
+        string? familyGroupId;
+        using (var groupDoc = JsonDocument.Parse(groupJson))
+        {
+            if (!groupDoc.RootElement.TryGetProperty("response", out var response))
+                return [];
+            if (response.TryGetProperty("is_not_member_of_any_group", out var notMember) && notMember.ValueKind == JsonValueKind.True)
+                return [];
+
+            familyGroupId = response.TryGetProperty("family_groupid", out var idElement) ? JsonIdToString(idElement) : null;
+        }
+
+        if (string.IsNullOrEmpty(familyGroupId) || familyGroupId == "0")
+            return [];
+
+        // include_own=false: the caller already has the user's own games from GetOwnedGames.
+        var libraryJson = await GetFamilyApiJsonAsync(http,
+            "https://api.steampowered.com/IFamilyGroupsService/GetSharedLibraryApps/v1/" +
+            $"?access_token={accessToken}&family_groupid={Uri.EscapeDataString(familyGroupId)}" +
+            "&include_own=false&include_excluded=false&include_free=false&include_non_games=false&language=english", ct);
+
+        using var libraryDoc = JsonDocument.Parse(libraryJson);
+        if (!libraryDoc.RootElement.TryGetProperty("response", out var libraryResponse) ||
+            !libraryResponse.TryGetProperty("apps", out var apps) ||
+            apps.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var games = new List<SteamAppInfo>();
+        foreach (var app in apps.EnumerateArray())
+        {
+            if (!app.TryGetProperty("appid", out var appIdElement) || JsonIdToString(appIdElement) is not { } appId)
+                continue;
+
+            // exclude_reason != 0 = listed but not playable from this account (e.g. not shareable).
+            if (app.TryGetProperty("exclude_reason", out var excludeReason) &&
+                excludeReason.ValueKind == JsonValueKind.Number && excludeReason.GetInt32() != 0)
+            {
+                continue;
+            }
+
+            var name = app.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
+            games.Add(new SteamAppInfo(appId, string.IsNullOrWhiteSpace(name) ? "Unknown" : name));
+        }
+
+        return games;
+    }
+
+    private static async Task<string> GetFamilyApiJsonAsync(HttpClient http, string url, CancellationToken ct)
+    {
+        using var response = await http.GetAsync(url, ct);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new SteamSessionExpiredException();
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(ct);
+    }
+
+    /// <summary>Steam's JSON sends 64-bit ids as strings and small ones as numbers; accept both.</summary>
+    private static string? JsonIdToString(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.String => element.GetString(),
+        JsonValueKind.Number => element.GetRawText(),
+        _ => null
+    };
 
     private static string BuildOwnedGamesUrl(string steamId64, string authParamName, string authParamValue) =>
         "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/" +

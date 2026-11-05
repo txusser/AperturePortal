@@ -316,8 +316,9 @@ public partial class AddGamesWindow : Window
     }
 
     /// <summary>
-    /// Prefers a real logged-in browser session (covers Family Sharing games, no key needed) and
-    /// only falls back to the Web API key if there's no session or the session has expired.
+    /// Prefers a real logged-in browser session (owned games plus Steam Family shared games, no key
+    /// needed) and only falls back to the Web API key - owned games only - if there's no session or
+    /// the session has expired.
     /// </summary>
     private async Task<List<SteamAppInfo>> FetchFullLibraryAsync(AppSettings settings, string webApiKey, bool hasSession)
     {
@@ -325,7 +326,8 @@ public partial class AddGamesWindow : Window
         {
             try
             {
-                return await _steamLibraryService.GetOwnedGamesViaSessionAsync(settings.SteamId64, settings.SteamLoginSecureCookie);
+                var owned = await _steamLibraryService.GetOwnedGamesViaSessionAsync(settings.SteamId64, settings.SteamLoginSecureCookie);
+                return owned.Concat(await TryGetFamilySharedGamesAsync(settings)).ToList();
             }
             catch (SteamSessionExpiredException)
             {
@@ -342,6 +344,23 @@ public partial class AddGamesWindow : Window
         }
 
         return await _steamLibraryService.GetOwnedGamesAsync(settings.SteamId64, webApiKey);
+    }
+
+    /// <summary>
+    /// The family library is an undocumented Steam service, so a failure there must never sink the
+    /// owned-games sync that already succeeded - log it and carry on without family games.
+    /// </summary>
+    private async Task<List<SteamAppInfo>> TryGetFamilySharedGamesAsync(AppSettings settings)
+    {
+        try
+        {
+            return await _steamLibraryService.GetFamilySharedGamesViaSessionAsync(settings.SteamLoginSecureCookie);
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"Steam Family library fetch failed: {ex}");
+            return [];
+        }
     }
 
     /// <summary>Fetches the first cover grid and first header image SteamGridDB has for this Steam game, if any, and stores them on the Game.</summary>
