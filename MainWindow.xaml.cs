@@ -1011,6 +1011,25 @@ public partial class MainWindow : Window
     private bool SteamSaysGameStillRunning() =>
         _runningSteamAppId is { } appId && SteamLibraryService.IsAppRunning(appId);
 
+    /// <summary>
+    /// Starts a Game Pass game by AUMID, which hands back its process ID to track. If activation
+    /// itself fails, falls back to shell-executing the shell:AppsFolder path: the game still starts,
+    /// and the session adopts its window the same way it does for a steam:// launch (null process).
+    /// </summary>
+    private static Process? LaunchXboxGame(string aumid, string exePath)
+    {
+        try
+        {
+            return XboxLibraryService.Launch(aumid);
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"Xbox activation failed for {aumid}, falling back to shell launch: {ex.Message}");
+            Process.Start(new ProcessStartInfo { FileName = exePath, UseShellExecute = true });
+            return null;
+        }
+    }
+
     private void EndGameSession()
     {
         _adoptionDeadline = null;
@@ -1328,6 +1347,9 @@ public partial class MainWindow : Window
         // (Steam itself resolves the actual exe), so File.Exists would always fail for them.
         var isSteamUri = game.ExePath.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
 
+        // Xbox/Game Pass games store "shell:AppsFolder\{AUMID}" - also not a file on disk.
+        var xboxAumid = XboxLibraryService.TryGetAumid(game.ExePath);
+
         if (game.IsEmulated)
         {
             if (!File.Exists(game.EmulatorPath))
@@ -1344,7 +1366,7 @@ public partial class MainWindow : Window
                 return;
             }
         }
-        else if (!isSteamUri && !File.Exists(game.ExePath))
+        else if (!isSteamUri && xboxAumid is null && !File.Exists(game.ExePath))
         {
             MessageBox.Show(this, $"Could not find the executable for '{game.Name}'.\n{game.ExePath}",
                 "Launch Failed", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1376,14 +1398,16 @@ public partial class MainWindow : Window
             // sometimes have, so nothing else in this method needs to change: the emulator's own
             // Exited event, ProcessSuspender freeze/resume via the overlay, etc. all work against
             // it exactly like they would against a plain native exe.
-            var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = game.IsEmulated ? game.EmulatorPath : game.ExePath,
-                Arguments = game.IsEmulated ? $"\"{game.ExePath}\"" : null,
-                WorkingDirectory = game.IsEmulated ? Path.GetDirectoryName(game.EmulatorPath)
-                                  : isSteamUri ? null : Path.GetDirectoryName(game.ExePath),
-                UseShellExecute = true
-            });
+            var process = xboxAumid is not null
+                ? LaunchXboxGame(xboxAumid, game.ExePath)
+                : Process.Start(new ProcessStartInfo
+                {
+                    FileName = game.IsEmulated ? game.EmulatorPath : game.ExePath,
+                    Arguments = game.IsEmulated ? $"\"{game.ExePath}\"" : null,
+                    WorkingDirectory = game.IsEmulated ? Path.GetDirectoryName(game.EmulatorPath)
+                                      : isSteamUri ? null : Path.GetDirectoryName(game.ExePath),
+                    UseShellExecute = true
+                });
 
             if (process != null)
             {

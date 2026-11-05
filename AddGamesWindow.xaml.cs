@@ -15,6 +15,7 @@ public partial class AddGamesWindow : Window
     private readonly SteamLibraryService _steamLibraryService = new();
     private readonly EpicGamesLibraryService _epicLibraryService = new();
     private readonly GogLibraryService _gogLibraryService = new();
+    private readonly XboxLibraryService _xboxLibraryService = new();
     private readonly LibraryScanService _scanService = new();
 
     private readonly ObservableCollection<EmulatorConfig> _emulators = new();
@@ -139,6 +140,9 @@ public partial class AddGamesWindow : Window
 
     private void RemoveGogLibraryButton_Click(object sender, RoutedEventArgs e) =>
         RemovePlatformLibrary(GamePlatform.Gog, "GOG", GogSyncStatusText);
+
+    private void RemoveXboxLibraryButton_Click(object sender, RoutedEventArgs e) =>
+        RemovePlatformLibrary(GamePlatform.Xbox, "Xbox", XboxSyncStatusText);
 
     private void RemovePlatformLibrary(GamePlatform platform, string platformLabel, TextBlock statusText) =>
         RemoveGamesMatching(g => g.Platform == platform, $"{platformLabel}-synced games", statusText);
@@ -378,6 +382,23 @@ public partial class AddGamesWindow : Window
             () => _gogLibraryService.GetInstalledGames().Select(g => (Key: g.GameId, g.Name, g.ExePath)).ToList(),
             SyncGogButton, GogSyncStatusText);
 
+    private async void SyncXboxButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Game Pass packages carry their own logo; use it when SteamGridDB has nothing (or no key).
+        var logos = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        await SyncLocalPlatformAsync(
+            GamePlatform.Xbox, "Xbox",
+            () => _xboxLibraryService.GetInstalledGames()
+                .Select(g =>
+                {
+                    logos[g.ExePath] = g.LogoPath;
+                    return (Key: g.Aumid, g.Name, g.ExePath);
+                })
+                .ToList(),
+            SyncXboxButton, XboxSyncStatusText,
+            fallbackCoverForExePath: exePath => logos.GetValueOrDefault(exePath));
+    }
+
     /// <summary>
     /// Shared by Epic and GOG: both are a pure local scan with no login/API key (unlike Steam's
     /// two-tier installed-vs-full-library sync), and both store a direct exe path rather than a
@@ -387,7 +408,8 @@ public partial class AddGamesWindow : Window
     private async Task SyncLocalPlatformAsync(
         GamePlatform platform, string platformLabel,
         Func<List<(string Key, string Name, string ExePath)>> getInstalledGames,
-        Button syncButton, TextBlock statusText)
+        Button syncButton, TextBlock statusText,
+        Func<string, string?>? fallbackCoverForExePath = null)
     {
         syncButton.IsEnabled = false;
         statusText.Text = "Syncing...";
@@ -437,6 +459,31 @@ public partial class AddGamesWindow : Window
                 statusText.Text = newEntries.Count == 1
                     ? "Added 1 new game and fetched its art."
                     : $"Added {newEntries.Count} new games and fetched art where available.";
+            }
+
+            // Platform-provided art (e.g. a Game Pass package's own logo) for anything SteamGridDB
+            // didn't cover - or everything, when there's no SteamGridDB key.
+            if (fallbackCoverForExePath is not null)
+            {
+                var coversAdded = false;
+                foreach (var game in newEntries.Where(g => string.IsNullOrEmpty(g.CoverImagePath)))
+                {
+                    if (fallbackCoverForExePath(game.ExePath) is not { } coverPath || !File.Exists(coverPath))
+                        continue;
+
+                    try
+                    {
+                        game.CoverImagePath = _libraryService.StoreCoverImage(coverPath, game.Name);
+                        coversAdded = true;
+                    }
+                    catch (Exception)
+                    {
+                        // Best-effort, same as the SteamGridDB loop above.
+                    }
+                }
+
+                if (coversAdded)
+                    _libraryService.SaveGames(existingGames);
             }
         }
         catch (Exception ex)

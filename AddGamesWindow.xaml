@@ -52,7 +52,7 @@
                                  Style="{StaticResource FilterTabStyle}" Checked="SourceTab_Checked"/>
                     <RadioButton Content="Steam" Tag="Steam" GroupName="SourceTab"
                                  Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="SourceTab_Checked"/>
-                    <RadioButton Content="Epic &amp; GOG" Tag="OtherLaunchers" GroupName="SourceTab"
+                    <RadioButton Content="Epic, GOG &amp; Xbox" Tag="OtherLaunchers" GroupName="SourceTab"
                                  Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="SourceTab_Checked"/>
                     <RadioButton Content="Emulators" Tag="Emulators" GroupName="SourceTab"
                                  Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="SourceTab_Checked"/>
@@ -132,7 +132,7 @@
 
                     <!-- ===================== Epic & GOG ===================== -->
                     <StackPanel x:Name="OtherLaunchersPanel" Visibility="Collapsed">
-                        <TextBlock Text="Both scan for games already installed on this PC, the same way Sync Installed Games does for Steam - no login needed. Cover art comes from your SteamGridDB key in Settings."
+                        <TextBlock Text="Each scans for games already installed on this PC, the same way Sync Installed Games does for Steam - no login needed. Cover art comes from your SteamGridDB key in Settings (Xbox games fall back to the game's own logo)."
                                    FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" Margin="0,0,0,16"/>
 
@@ -155,6 +155,17 @@
                                     Padding="16,0" Margin="10,0,0,0" Click="RemoveGogLibraryButton_Click"/>
                         </StackPanel>
                         <TextBlock x:Name="GogSyncStatusText" FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,8,0,16"/>
+
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="SyncXboxButton" Content="Sync Xbox / Game Pass Library" Height="34"
+                                    Padding="16,0" Style="{StaticResource AccentButtonStyle}"
+                                    Click="SyncXboxButton_Click"/>
+                            <Button x:Name="RemoveXboxButton" Content="Remove" Height="34" MinWidth="80"
+                                    Padding="16,0" Margin="10,0,0,0" Click="RemoveXboxLibraryButton_Click"/>
+                        </StackPanel>
+                        <TextBlock x:Name="XboxSyncStatusText" FontSize="11"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
