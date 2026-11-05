@@ -190,7 +190,10 @@ public partial class ConsoleModeWindow : Window
         Dispatcher.Invoke(() =>
         {
             Show();
-            Activate();
+
+            // Not just Activate(): that silently fails when Steam grabs the foreground as the
+            // game closes, leaving this window hidden behind it - see WindowFocus.
+            WindowFocus.ReturnToFront(this);
 
             // Resyncs to whatever's actually physically held right now rather than blindly assuming
             // nothing is - a normal full play session ending naturally, nothing usually is, so this

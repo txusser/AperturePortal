@@ -107,6 +107,13 @@ public partial class MainWindow : Window
     private Game? _runningGame;
     private DateTime _runningProcessStartedAt;
     private DateTime? _adoptionDeadline;
+
+    // Steam-launched games: the session follows Steam's own "app is running" flag (see
+    // SteamLibraryService.IsAppRunning) instead of whichever process we happened to adopt, which
+    // can be a launcher (RDR2's Rockstar Games Launcher) or an anti-cheat process we can't watch.
+    private string? _runningSteamAppId;
+    private bool _steamReportedRunning;
+
     private bool _isChildDialogOpen;
     private OverlayWindow? _overlayWindow;
     private LaunchingWindow? _launchingWindow;
@@ -462,6 +469,21 @@ public partial class MainWindow : Window
             _launchingWindow = null;
         }
 
+        // Steam-launched game: end the session when Steam itself says the game has stopped. Only
+        // once Steam has reported it running at least once, so a slow start - or a Steam client
+        // that never writes the flag - falls back to the process tracking below.
+        if (_runningGame is not null && _runningSteamAppId is { } steamAppId)
+        {
+            if (SteamLibraryService.IsAppRunning(steamAppId))
+            {
+                _steamReportedRunning = true;
+            }
+            else if (_steamReportedRunning)
+            {
+                EndGameSession();
+            }
+        }
+
         // A tracked process exited suspiciously fast (see GameProcess_Exited) and we're waiting
         // to see whether the real game takes over the foreground before giving up on it.
         if (_adoptionDeadline is { } deadline)
@@ -472,7 +494,12 @@ public partial class MainWindow : Window
             }
             else if (DateTime.UtcNow >= deadline)
             {
-                EndGameSession();
+                // Steam says the game is still up (e.g. we couldn't open its anti-cheat-protected
+                // process): keep the session alive rather than popping the launcher up mid-game.
+                if (SteamSaysGameStillRunning())
+                    _adoptionDeadline = DateTime.UtcNow + AdoptionGracePeriod;
+                else
+                    EndGameSession();
             }
         }
 
@@ -891,6 +918,19 @@ public partial class MainWindow : Window
             if (_runningGameProcess is null || (sender is Process senderProcess && !ReferenceEquals(senderProcess, _runningGameProcess)))
                 return;
 
+            if (SteamSaysGameStillRunning())
+            {
+                // The process we were tracking is gone but Steam says the game isn't - a launcher
+                // or bootstrapper handed off, or exited before the game did. Drop it and adopt
+                // whatever takes the foreground next; the Steam flag check in the gamepad tick
+                // ends the session once the game has really closed.
+                _runningGameProcess.Exited -= GameProcess_Exited;
+                _runningGameProcess = null;
+                if (!TryAdoptForegroundProcess())
+                    _adoptionDeadline = DateTime.UtcNow + AdoptionGracePeriod;
+                return;
+            }
+
             bool wasShortLived = DateTime.UtcNow - _runningProcessStartedAt < BootstrapperExitThreshold;
 
             if (wasShortLived && TryAdoptForegroundProcess())
@@ -929,7 +969,7 @@ public partial class MainWindow : Window
         try
         {
             var process = Process.GetProcessById((int)pid);
-            if (IsSteamClientProcess(process.ProcessName))
+            if (IsNeverTheGame(process.ProcessName))
                 return false;
 
             if (_runningGameProcess is { HasExited: false })
@@ -960,13 +1000,22 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool IsSteamClientProcess(string processName) =>
+    // Steam's own client/UI, plus Explorer: when a game closes, the desktop or taskbar can hold the
+    // foreground for a moment, and adopting it would leave the session waiting on a process that
+    // never exits.
+    private static bool IsNeverTheGame(string processName) =>
         processName.Equals("steam", StringComparison.OrdinalIgnoreCase) ||
-        processName.Equals("steamwebhelper", StringComparison.OrdinalIgnoreCase);
+        processName.Equals("steamwebhelper", StringComparison.OrdinalIgnoreCase) ||
+        processName.Equals("explorer", StringComparison.OrdinalIgnoreCase);
+
+    private bool SteamSaysGameStillRunning() =>
+        _runningSteamAppId is { } appId && SteamLibraryService.IsAppRunning(appId);
 
     private void EndGameSession()
     {
         _adoptionDeadline = null;
+        _runningSteamAppId = null;
+        _steamReportedRunning = false;
         _overlayWindow?.Close();
         _overlayWindow = null;
         _runningGameProcess = null;
@@ -974,6 +1023,11 @@ public partial class MainWindow : Window
         UnregisterGameHotkey();
         ForceGameGridRedraw();
         GameSessionEnded?.Invoke(this, EventArgs.Empty);
+
+        // Desktop mode: this window stayed open behind the game, so bring it back too. In Console
+        // Mode it's hidden and ConsoleModeWindow handles GameSessionEnded itself.
+        if (IsVisible)
+            WindowFocus.ReturnToFront(this);
     }
 
     /// <summary>
@@ -1308,6 +1362,8 @@ public partial class MainWindow : Window
                 _runningGameProcess.Exited -= GameProcess_Exited;
             }
             _adoptionDeadline = null;
+            _runningSteamAppId = isSteamUri ? SteamLibraryService.TryGetSteamAppId(game.ExePath) : null;
+            _steamReportedRunning = false;
 
             _launchingWindow?.Close();
             _launchingWindow = new LaunchingWindow();

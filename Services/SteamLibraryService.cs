@@ -151,6 +151,31 @@ public sealed class SteamLibraryService
     }
 
     /// <summary>
+    /// Whether the Steam client currently reports this app as running. Steam keeps
+    /// HKCU\Software\Valve\Steam\Apps\{appid}\Running and HKCU\Software\Valve\Steam\RunningAppID
+    /// up to date for the game's whole process tree - including launcher hand-offs (RDR2 starts
+    /// the Rockstar Games Launcher, which starts RDR2.exe) and anti-cheat-protected processes we
+    /// can't open ourselves - so it's a better "is the game still up?" signal than any single
+    /// process we could track.
+    /// </summary>
+    public static bool IsAppRunning(string appId)
+    {
+        try
+        {
+            using var appKey = Registry.CurrentUser.OpenSubKey($@"Software\Valve\Steam\Apps\{appId}");
+            if (appKey?.GetValue("Running") is int running && running != 0)
+                return true;
+
+            using var steamKey = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+            return steamKey?.GetValue("RunningAppID") is int runningAppId && runningAppId.ToString() == appId;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Looks up the given app's local appmanifest across every Steam library folder. Null means no
     /// manifest exists anywhere - the game has never been installed and nothing is downloading.
     /// </summary>
