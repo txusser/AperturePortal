@@ -161,9 +161,7 @@ foreach ($pkg in Get-AppxPackage) {
 }
 
 # ------------------------------------------------------------------ Output
-$out = Join-Path $here 'games.json'
-ConvertTo-Json -InputObject @($games) -Depth 4 | Set-Content -LiteralPath $out -Encoding UTF8
-
+# Console results first, so a failure saving the file can't hide them.
 $games | Sort-Object source, title |
     Format-Table source, title, installed, owner, @{ n = 'cover'; e = { [bool]$_.cover } } -AutoSize
 
@@ -177,4 +175,34 @@ Write-Host ("Steam games: {0} (owner=me: {1}, family: {2}, unknown: {3})" -f $st
     @($steam | Where-Object owner -like 'family-*').Count,
     @($steam | Where-Object owner -eq 'unknown').Count)
 Write-Host ("Xbox games : {0}" -f $xbox.Count)
-Write-Host "Saved      : $out"
+
+# Report any field that isn't plain text/bool (Windows PowerShell 5.1's ConvertTo-Json can choke
+# on those), then save plain copies.
+foreach ($g in $games) {
+    foreach ($p in $g.PSObject.Properties) {
+        if ($null -ne $p.Value -and $p.Value -isnot [string] -and $p.Value -isnot [bool]) {
+            Write-Warning ("{0}.{1} is {2}" -f $g.title, $p.Name, $p.Value.GetType().FullName)
+        }
+    }
+}
+
+$plain = foreach ($g in $games) {
+    [ordered]@{
+        source      = [string]$g.source
+        id          = [string]$g.id
+        title       = [string]$g.title
+        installed   = [bool]$g.installed
+        owner       = $(if ($null -ne $g.owner) { [string]$g.owner } else { $null })
+        installPath = [string]$g.installPath
+        launch      = [string]$g.launch
+        cover       = $(if ($g.cover) { [string]$g.cover } else { $null })
+    }
+}
+
+$out = Join-Path $here 'games.json'
+try {
+    ConvertTo-Json -InputObject @($plain) -Depth 3 | Set-Content -LiteralPath $out -Encoding UTF8
+    Write-Host "Saved      : $out"
+} catch {
+    Write-Warning "Could not save games.json: $_"
+}
