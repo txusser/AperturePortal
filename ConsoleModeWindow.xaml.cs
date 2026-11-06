@@ -312,10 +312,15 @@ public partial class ConsoleModeWindow : Window
 
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (GameListBox.ItemContainerGenerator.ContainerFromIndex(index) is ListBoxItem container)
+            // The grid is virtualized, so the tile only exists once ScrollIntoView's layout pass has
+            // run; force that pass if it hasn't happened yet.
+            if (GameListBox.ItemContainerGenerator.ContainerFromIndex(index) is not ListBoxItem container)
             {
-                container.Focus();
+                GameListBox.UpdateLayout();
+                container = GameListBox.ItemContainerGenerator.ContainerFromIndex(index) as ListBoxItem;
             }
+
+            container?.Focus();
         }), DispatcherPriority.Input);
     }
 

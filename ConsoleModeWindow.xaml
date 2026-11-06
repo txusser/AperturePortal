@@ -3,6 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ApertureOS"
+        xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
         mc:Ignorable="d"
         Title="Aperture Portal - Console Mode"
         Icon="Assets/AppIcon.ico"
@@ -71,14 +73,19 @@
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Hidden"
                  KeyboardNavigation.DirectionalNavigation="None"
-                 Focusable="False">
+                 Focusable="False"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Standard"
+                 VirtualizingPanel.ScrollUnit="Pixel"
+                 ScrollViewer.CanContentScroll="True">
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <!-- Centered so leftover width (columns * slot width rarely fills the row exactly)
-                         splits evenly on both sides instead of piling up on the right. Set here on the
-                         WrapPanel itself rather than on GameListBox, since UpdateColumns() reads
-                         GameListBox.ActualWidth and needs that to stay the full viewport width. -->
-                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                    <!-- Virtualized (only tiles in view exist) - a plain WrapPanel built a tile for every
+                         game on each filter change, which took seconds with a full library.
+                         StartAndEndOnly puts leftover width (columns * slot width rarely fills the row
+                         exactly) evenly on both sides, like the old centered WrapPanel; UpdateColumns()
+                         still reads GameListBox.ActualWidth as the full viewport width. -->
+                    <vwp:VirtualizingWrapPanel SpacingMode="StartAndEndOnly"/>
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
 
@@ -113,7 +120,7 @@
                         </Border.Clip>
                         <StackPanel>
                             <Grid Width="210" Height="288" ClipToBounds="True">
-                                <Image Source="{Binding CoverImagePath}" Width="210" Height="288" Stretch="UniformToFill">
+                                <Image Source="{Binding CoverImagePath, Converter={x:Static local:CoverImageConverter.Instance}}" Width="210" Height="288" Stretch="UniformToFill">
                                     <Image.Effect>
                                         <BlurEffect x:Name="CoverBlur" Radius="0"/>
                                     </Image.Effect>

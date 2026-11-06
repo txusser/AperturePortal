@@ -217,10 +217,12 @@ public partial class AddGameWindow : Window
             }
         }
 
-        // Steam-synced games store a steam://rungameid/{appid} URI rather than a real file path.
-        var isSteamUri = exePath.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
+        // Steam-synced games store a steam://rungameid/{appid} URI and Xbox/Game Pass games a
+        // shell:AppsFolder\{AUMID} path rather than a real file path.
+        var isLauncherUri = exePath.StartsWith("steam://", StringComparison.OrdinalIgnoreCase) ||
+                            XboxLibraryService.TryGetAumid(exePath) is not null;
 
-        if (!isEmulated && (string.IsNullOrWhiteSpace(exePath) || (!isSteamUri && !File.Exists(exePath))))
+        if (!isEmulated && (string.IsNullOrWhiteSpace(exePath) || (!isLauncherUri && !File.Exists(exePath))))
         {
             MessageBox.Show(this, "Please select a valid game executable.", "Missing Information", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;

@@ -639,8 +639,20 @@ public partial class MainWindow : Window
     {
         Dispatcher.BeginInvoke(new Action(() =>
         {
+            // The grid is virtualized: a tile that's scrolled out of view has no container until the
+            // panel brings it into view and lays it out.
             if (GamesItemsControl.ItemContainerGenerator.ContainerFromIndex(index) is not ContentPresenter presenter)
-                return;
+            {
+                if (FindVisualChild<VirtualizingPanel>(GamesItemsControl) is not { } panel)
+                    return;
+
+                panel.BringIndexIntoViewPublic(index);
+                GamesItemsControl.UpdateLayout();
+                if (GamesItemsControl.ItemContainerGenerator.ContainerFromIndex(index) is not ContentPresenter realized)
+                    return;
+
+                presenter = realized;
+            }
 
             presenter.ApplyTemplate();
             if (FindVisualChild<Button>(presenter) is { } button)

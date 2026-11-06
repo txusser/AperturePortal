@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:local="clr-namespace:ApertureOS"
+        xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
         mc:Ignorable="d"
         Title="Aperture Portal" Height="640" Width="960" MinWidth="720" MinHeight="480"
         Icon="Assets/AppIcon.ico"
@@ -124,11 +125,28 @@
                 </ItemsControl>
 
                 <Grid Grid.Row="3">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="GamesItemsControl" Padding="16,16,16,24" HorizontalAlignment="Center">
+                    <!-- Virtualized: only the tiles in view (plus a small buffer) exist. With a full
+                         Steam + family library, a plain WrapPanel built a tile for every game on each
+                         filter change, which took seconds. The ScrollViewer lives inside the template
+                         (not around the ItemsControl) because virtualization needs the panel to own
+                         scrolling. StartAndEndOnly keeps the old look: tiles packed, row centered. -->
+                    <ItemsControl x:Name="GamesItemsControl" Padding="16,16,16,24"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Standard"
+                                  VirtualizingPanel.ScrollUnit="Pixel"
+                                  ScrollViewer.CanContentScroll="True">
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                              CanContentScroll="True" Focusable="False"
+                                              Padding="{TemplateBinding Padding}">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal"/>
+                                <vwp:VirtualizingWrapPanel SpacingMode="StartAndEndOnly"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemContainerStyle>
@@ -169,7 +187,7 @@
                                                         </Border.Clip>
                                                         <StackPanel>
                                                             <Grid Width="160" Height="240" ClipToBounds="True">
-                                                                <Image Source="{Binding CoverImagePath}" Width="160" Height="240" Stretch="UniformToFill">
+                                                                <Image Source="{Binding CoverImagePath, Converter={x:Static local:CoverImageConverter.Instance}}" Width="160" Height="240" Stretch="UniformToFill">
                                                                     <Image.Effect>
                                                                         <BlurEffect x:Name="CoverBlur" Radius="0"/>
                                                                     </Image.Effect>
@@ -343,7 +361,6 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </ScrollViewer>
 
                 <!-- Shown only when the library has no games at all (not just "none match the
                      current filter") - AddGameButton_Click is reused directly as the call to action
