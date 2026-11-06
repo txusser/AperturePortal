@@ -342,6 +342,7 @@ public partial class MainWindow : Window
         _currentFilter = filter;
         ApplySort(filter);
         _gamesView.Refresh();
+        ViewTitleText.Text = filter.ToString();
 
         // The grid just reshuffled under whatever tile/index the keyboard or a controller had
         // focused - stale coordinates from the old layout would send Up/Down/Left/Right off in
