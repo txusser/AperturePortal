@@ -23,6 +23,8 @@ public partial class GameActionConfirmWindow : Window
     private readonly DispatcherTimer _inputTimer = new(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly GamepadEdge _leftEdge = new();
     private readonly GamepadEdge _rightEdge = new();
+    private readonly GamepadEdge _upEdge = new();
+    private readonly GamepadEdge _downEdge = new();
     private readonly GamepadEdge _confirmEdge = new();
     private readonly GamepadEdge _cancelEdge = new();
 
@@ -58,8 +60,15 @@ public partial class GameActionConfirmWindow : Window
     {
         InitializeComponent();
 
-        MessageText.Text = message;
-        ConfirmButton.Content = confirmButtonText;
+        // Side-panel layout (redesign): the game is the title; the old question line only remains
+        // for the info-only variant ("... is currently installing").
+        TitleText.Text = game.Name;
+        MessageText.Text = infoOnly ? message : game.IsInstalled ? string.Empty : "Not installed yet - Install hands it to Steam.";
+        MessageText.Visibility = MessageText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ConfirmButton.Content = confirmButtonText == "Launch" ? "Play" : confirmButtonText;
+        PlatformText.Text = CategoryService.GetPlatformDisplayName(game.Platform).ToUpperInvariant();
+        FamilyBadge.Visibility = game.IsFamilyShared ? Visibility.Visible : Visibility.Collapsed;
+        FillStats(game);
         if (infoOnly)
         {
             CancelButton.Visibility = Visibility.Collapsed;
@@ -72,22 +81,29 @@ public partial class GameActionConfirmWindow : Window
             FinishButton.Content = game.IsFinished ? "Not finished" : "Finished";
         }
 
-        InfoText.Text = GameInfoService.Shared.Get(game)?.Summary() ?? string.Empty;
-        InfoText.Visibility = InfoText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-
         HintText.Visibility = isConsoleMode ? Visibility.Visible : Visibility.Collapsed;
         if (isConsoleMode && infoOnly)
         {
             HintText.Text = "A or B to close";
         }
 
-        if (File.Exists(game.CoverImagePath))
+        var artPath = File.Exists(game.HeaderImagePath) ? game.HeaderImagePath
+                    : File.Exists(game.CoverImagePath) ? game.CoverImagePath
+                    : null;
+        if (artPath is not null)
         {
-            CoverImage.Source = new BitmapImage(new Uri(game.CoverImagePath));
+            var art = new BitmapImage();
+            art.BeginInit();
+            art.UriSource = new Uri(artPath);
+            art.CacheOption = BitmapCacheOption.OnLoad;
+            art.DecodePixelWidth = 1000;
+            art.EndInit();
+            HeroArt.Source = art;
         }
 
         Loaded += (_, _) =>
         {
+            PlaceOverOwner();
             ConfirmButton.Focus();
 
             // Prime the trackers to the *actual* current physical state rather than assuming
@@ -103,6 +119,8 @@ public partial class GameActionConfirmWindow : Window
             var pad = GamepadService.Poll();
             _leftEdge.Sync(pad.Left);
             _rightEdge.Sync(pad.Right);
+            _upEdge.Sync(pad.Up);
+            _downEdge.Sync(pad.Down);
             _confirmEdge.Sync(pad.A);
             _cancelEdge.Sync(pad.B);
 
@@ -117,12 +135,64 @@ public partial class GameActionConfirmWindow : Window
         var pad = GamepadService.Poll();
         _leftEdge.Update(pad.Left, () => MoveSelection(-1));
         _rightEdge.Update(pad.Right, () => MoveSelection(1));
+        // Vertical layout: Down from Play goes to the row below it, Up goes back to Play.
+        _upEdge.Update(pad.Up, () => ConfirmButton.Focus());
+        _downEdge.Update(pad.Down, () => { if (Keyboard.FocusedElement == ConfirmButton) MoveSelection(1); });
         _confirmEdge.Update(pad.A, ActivateFocusedButton);
         _cancelEdge.Update(pad.B, () =>
         {
             DialogResult = false;
             Close();
         });
+    }
+
+    /// <summary>Covers the owner window exactly (dimmed backdrop), so the panel docks to its right edge.</summary>
+    private void PlaceOverOwner()
+    {
+        if (Owner is null)
+            return;
+
+        if (Owner.WindowState == WindowState.Maximized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+        else
+        {
+            Left = Owner.Left;
+            Top = Owner.Top;
+            Width = Owner.ActualWidth;
+            Height = Owner.ActualHeight;
+        }
+
+        SidePanel.Width = Math.Min(760, Math.Max(480, (Owner.WindowState == WindowState.Maximized ? SystemParameters.PrimaryScreenWidth : Owner.ActualWidth) * 0.55));
+    }
+
+    private void FillStats(Game game)
+    {
+        var info = GameInfoService.Shared.Get(game);
+        MainHoursText.Text = info?.MainHours is { } main ? $"{main:0.#} h" : "—";
+        ExtrasHoursText.Text = info?.ExtrasHours is { } extras ? $"{extras:0.#} h with extras" : " ";
+        CriticText.Text = info?.CriticScore is { } critic ? $"{critic:0}" : "—";
+        CriticCountText.Text = info?.CriticCount is { } count ? $"{count} critic reviews" : " ";
+        SteamText.Text = info?.SteamPositivePercent is { } positive ? $"{positive}%" : "—";
+        SteamLabelText.Text = info?.SteamReviewSummary ?? " ";
+
+        var meta = new List<string>();
+        if (game.LastPlayedAt is { } played)
+            meta.Add($"Last played {played.ToLocalTime():d MMM yyyy}");
+        if (info?.Genres is { Count: > 0 } genres)
+            meta.Add(string.Join(", ", genres.Take(3)));
+        if (info?.ReleaseYear is { } year)
+            meta.Add(year.ToString());
+        if (info is null)
+            meta.Add("Length and scores appear after Settings → Fetch Game Info");
+        MetaText.Text = string.Join("  ·  ", meta);
+    }
+
+    private void Backdrop_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        DialogResult = false;
+        Close();
     }
 
     private void MoveSelection(int direction)

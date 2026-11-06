@@ -4,46 +4,116 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Confirm" Height="520" Width="680"
+        Title="Game" Height="720" Width="1280"
         Icon="Assets/AppIcon.ico"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
         ShowInTaskbar="False"
         UseLayoutRounding="True"
-        Background="{StaticResource WindowBackgroundBrush}">
+        FontFamily="{StaticResource BodyFont}">
+    <!-- Side panel over the dimmed owner window (redesign): the window covers the owner exactly
+         (see PlaceOverOwner) and the panel docks to its right edge. -->
+    <Grid>
+        <Rectangle Fill="#A60A0C10" MouseLeftButtonDown="Backdrop_MouseLeftButtonDown"/>
 
-    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
-        <Grid Margin="28">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Border Width="160" Height="240" Background="{StaticResource SurfaceBrush}"
-                        CornerRadius="{StaticResource CardCornerRadius}" Margin="0,0,0,20" ClipToBounds="True">
-                    <Image x:Name="CoverImage" Stretch="UniformToFill"/>
-                </Border>
+        <Border x:Name="SidePanel" HorizontalAlignment="Right" Width="760" Background="#11151C"
+                BorderBrush="#222936" BorderThickness="1,0,0,0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="60" ShadowDepth="0" Opacity="0.5" Color="Black"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="340"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                <TextBlock x:Name="MessageText" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
-                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" Margin="0,0,0,8"/>
+                <!-- Art (header image, else cover) fading into the panel -->
+                <Grid Grid.Row="0" ClipToBounds="True">
+                    <Border Background="{StaticResource SurfaceBrush}"/>
+                    <Image x:Name="HeroArt" Stretch="UniformToFill" VerticalAlignment="Center"/>
+                    <Rectangle>
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#0011151C" Offset="0.45"/>
+                                <GradientStop Color="#FF11151C" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                </Grid>
 
-                <!-- Length/scores from GameInfoService, when fetched (Settings → Game info). -->
-                <TextBlock x:Name="InfoText" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440" Margin="0,0,0,20"/>
+                <DockPanel Grid.Row="1" Margin="52,-36,52,40" LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Top">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="{StaticResource TextPrimaryBrush}" CornerRadius="4" Padding="9,4" Margin="0,0,10,0">
+                                <TextBlock x:Name="PlatformText" FontSize="13" FontWeight="Bold" Foreground="{StaticResource OnAccentBrush}"/>
+                            </Border>
+                            <Border x:Name="FamilyBadge" Background="{StaticResource FamilyBrush}" CornerRadius="4" Padding="9,4" Visibility="Collapsed">
+                                <TextBlock Text="FAMILY" FontSize="13" FontWeight="Bold" Foreground="{StaticResource OnAccentBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock x:Name="TitleText" FontFamily="{StaticResource DisplayFont}" FontSize="50" Margin="0,14,0,0"
+                                   Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" LineHeight="54"/>
+                        <TextBlock x:Name="MessageText" FontSize="16" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button x:Name="ConfirmButton" Width="140" Height="42" Margin="0,0,12,0"
-                            Style="{StaticResource AccentButtonStyle}" FontSize="14"
-                            IsDefault="True" Click="ConfirmButton_Click"/>
-                    <Button x:Name="FinishButton" Content="Finished" Width="140" Height="42" FontSize="14"
-                            Margin="0,0,12,0" Click="FinishButton_Click"/>
-                    <Button x:Name="HideButton" Content="Hide" Width="140" Height="42" FontSize="14"
-                            Margin="0,0,12,0" Click="HideButton_Click"/>
-                    <Button x:Name="CancelButton" Content="Cancel" Width="140" Height="42" FontSize="14"
-                            IsCancel="True" Click="CancelButton_Click"/>
-                </StackPanel>
+                        <!-- Length / critics / Steam from GameInfoService ("—" until fetched). -->
+                        <UniformGrid x:Name="StatsGrid" Columns="3" Margin="0,26,0,0">
+                            <UniformGrid.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#171C25"/>
+                                    <Setter Property="CornerRadius" Value="14"/>
+                                    <Setter Property="Padding" Value="20,16"/>
+                                    <Setter Property="Margin" Value="0,0,14,0"/>
+                                </Style>
+                            </UniformGrid.Resources>
+                            <Border>
+                                <StackPanel>
+                                    <TextBlock Text="Main story" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="MainHoursText" FontFamily="{StaticResource DisplayFont}" FontSize="32" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,2"/>
+                                    <TextBlock x:Name="ExtrasHoursText" FontSize="13" Foreground="#8C95A4"/>
+                                </StackPanel>
+                            </Border>
+                            <Border>
+                                <StackPanel>
+                                    <TextBlock Text="Critics" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="CriticText" FontFamily="{StaticResource DisplayFont}" FontSize="32" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,2"/>
+                                    <TextBlock x:Name="CriticCountText" FontSize="13" Foreground="#8C95A4"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="0">
+                                <StackPanel>
+                                    <TextBlock Text="Steam reviews" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="SteamText" FontFamily="{StaticResource DisplayFont}" FontSize="32" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,2"/>
+                                    <TextBlock x:Name="SteamLabelText" FontSize="13" Foreground="#8C95A4" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
 
-                <TextBlock x:Name="HintText" Text="D-Pad/A to confirm • B to cancel" FontSize="11"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           HorizontalAlignment="Center" Margin="0,16,0,0"/>
-            </StackPanel>
-        </Grid>
-    </Border>
+                        <TextBlock x:Name="MetaText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,20,0,0"/>
+                    </StackPanel>
+
+                    <!-- Actions: D-pad moves, A chooses, B closes -->
+                    <StackPanel DockPanel.Dock="Bottom">
+                        <Button x:Name="ConfirmButton" Height="64" FontSize="21"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsDefault="True" Click="ConfirmButton_Click"/>
+                        <UniformGrid x:Name="SecondaryButtons" Columns="3" Margin="0,12,0,0">
+                            <Button x:Name="FinishButton" Content="Finished" Height="52" FontSize="16" FontWeight="SemiBold"
+                                    Margin="0,0,6,0" Click="FinishButton_Click"/>
+                            <Button x:Name="HideButton" Content="Hide" Height="52" FontSize="16" FontWeight="SemiBold"
+                                    Margin="6,0,6,0" Click="HideButton_Click"/>
+                            <Button x:Name="CancelButton" Content="Close" Height="52" FontSize="16" FontWeight="SemiBold"
+                                    Margin="6,0,0,0" IsCancel="True" Click="CancelButton_Click"/>
+                        </UniformGrid>
+                        <TextBlock x:Name="HintText" Text="D-pad to move · A to choose · B to close" FontSize="14"
+                                   Foreground="#8C95A4" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
