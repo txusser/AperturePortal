@@ -23,6 +23,9 @@ public class AppSettings
     /// <summary>The same session cookie, DPAPI-encrypted for the current Windows user - what settings.json actually holds.</summary>
     public string SteamLoginSecureCookieProtected { get; set; } = string.Empty;
 
+    /// <summary>True = at startup, quietly fetch SteamGridDB art for games with no cover (or placeholder art).</summary>
+    public bool AutoFetchMissingArt { get; set; }
+
     /// <summary>True = skip the normal window on launch and go straight into Console Mode.</summary>
     public bool LaunchInConsoleMode { get; set; }
 

@@ -58,6 +58,17 @@
                                FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                TextWrapping="Wrap" Margin="0,8,0,0"/>
 
+                    <CheckBox x:Name="AutoFetchMissingArtCheckBox" Content="Fetch missing art automatically at startup"
+                              Foreground="{StaticResource TextPrimaryBrush}" Margin="0,14,0,0"/>
+                    <Button x:Name="FetchMissingArtButton" Content="Fetch Missing Art Now" Height="34"
+                            HorizontalAlignment="Left" Padding="16,0" Margin="0,10,0,0" Click="FetchMissingArtButton_Click"/>
+                    <TextBlock Text="Looks up SteamGridDB art for games with no cover, and replaces the plain logos Game Pass games start with."
+                               FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    <TextBlock x:Name="FetchMissingArtStatusText" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,8,0,0"/>
+
                     <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,20,0,20"/>
 
                     <Button x:Name="RefreshLibraryButton" Content="Refresh Library" Height="34"

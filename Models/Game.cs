@@ -28,6 +28,12 @@ public class Game : INotifyPropertyChanged
     public string CoverImagePath { get; set; } = string.Empty;
     public string HeaderImagePath { get; set; } = string.Empty;
 
+    /// <summary>True when the cover is stand-in art (e.g. a Game Pass package's square logo), so "Fetch missing art" replaces it once SteamGridDB has a real grid.</summary>
+    public bool CoverIsPlaceholder { get; set; }
+
+    /// <summary>Steam game playable through Steam Families: the license belongs to another family member. Set by the Steam syncs.</summary>
+    public bool IsFamilyShared { get; set; }
+
     // Without this, System.Text.Json serializes the enum as a raw integer by default - fine until
     // GamePlatform's members ever get reordered or one's inserted in the middle, which would then
     // silently reinterpret every existing game.json's saved Platform as the wrong platform. Storing
@@ -108,10 +114,10 @@ public class Game : INotifyPropertyChanged
 
     /// <summary>Steam is the app's implicit default platform and Manual has no platform to show, so only the less-common ones get a corner badge - keeps the common case visually quiet.</summary>
     [JsonIgnore]
-    public bool ShowPlatformBadge => Platform is GamePlatform.Epic or GamePlatform.Gog or GamePlatform.BattleNet or GamePlatform.Xbox;
+    public bool ShowPlatformBadge => IsFamilyShared || Platform is GamePlatform.Epic or GamePlatform.Gog or GamePlatform.BattleNet or GamePlatform.Xbox;
 
     [JsonIgnore]
-    public string PlatformBadgeText => Platform switch
+    public string PlatformBadgeText => IsFamilyShared ? "FAMILY" : Platform switch
     {
         GamePlatform.Epic => "EPIC",
         GamePlatform.Gog => "GOG",

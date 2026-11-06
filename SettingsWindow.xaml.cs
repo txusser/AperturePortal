@@ -19,6 +19,7 @@ public partial class SettingsWindow : Window
         ApiKeyTextBox.Text = settings.SteamGridDbApiKey;
         StartWithWindowsCheckBox.IsChecked = StartupService.IsEnabled();
         LaunchConsoleModeCheckBox.IsChecked = settings.LaunchInConsoleMode;
+        AutoFetchMissingArtCheckBox.IsChecked = settings.AutoFetchMissingArt;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -34,6 +35,7 @@ public partial class SettingsWindow : Window
         var settings = _settingsService.Load();
         settings.SteamGridDbApiKey = ApiKeyTextBox.Text.Trim();
         settings.LaunchInConsoleMode = LaunchConsoleModeCheckBox.IsChecked == true;
+        settings.AutoFetchMissingArt = AutoFetchMissingArtCheckBox.IsChecked == true;
         _settingsService.Save(settings);
 
         if (!StartupService.SetEnabled(StartWithWindowsCheckBox.IsChecked == true))
@@ -62,5 +64,42 @@ public partial class SettingsWindow : Window
     {
         var games = _libraryService.LoadGames();
         RefreshStatusText.Text = $"Library refreshed - {games.Count} game{(games.Count == 1 ? "" : "s")} on file.";
+    }
+
+    private async void FetchMissingArtButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Uses the key as typed, so it works before Save too.
+        var apiKey = ApiKeyTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            FetchMissingArtStatusText.Text = "Enter a SteamGridDB API key first.";
+            return;
+        }
+
+        FetchMissingArtButton.IsEnabled = false;
+        try
+        {
+            var games = _libraryService.LoadGames();
+            var missing = games.Count(ArtFetchService.NeedsArt);
+            if (missing == 0)
+            {
+                FetchMissingArtStatusText.Text = "Every game already has art.";
+                return;
+            }
+
+            var progress = new Progress<string>(text => FetchMissingArtStatusText.Text = text);
+            var updated = await ArtFetchService.FetchMissingArtAsync(apiKey, _libraryService, games, progress);
+            _libraryService.SaveGames(games);
+            FetchMissingArtStatusText.Text =
+                $"Found art for {updated} of {missing} game{(missing == 1 ? "" : "s")}. The rest have no SteamGridDB match - use Find Art in Edit to pick one by hand.";
+        }
+        catch (Exception ex)
+        {
+            FetchMissingArtStatusText.Text = $"Fetching art failed: {ex.Message}";
+        }
+        finally
+        {
+            FetchMissingArtButton.IsEnabled = true;
+        }
     }
 }

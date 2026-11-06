@@ -7,7 +7,8 @@ using Microsoft.Win32;
 
 namespace ApertureOS.Services;
 
-public sealed record SteamAppInfo(string AppId, string Name);
+/// <param name="IsFamilyShared">True when the license belongs to another Steam Family member.</param>
+public sealed record SteamAppInfo(string AppId, string Name, bool IsFamilyShared = false);
 
 /// <summary>
 /// Local install/download state for one Steam app, read straight from its appmanifest_&lt;id&gt;.acf -
@@ -37,11 +38,16 @@ public sealed class SteamLibraryService
     /// library folder) - no Steam Web API key or network access needed, but only finds games
     /// actually installed on this PC.
     /// </summary>
-    public List<SteamAppInfo> GetInstalledGames()
+    public List<SteamAppInfo> GetInstalledGames(string? mySteamId64 = null)
     {
         var steamPath = FindSteamInstallPath();
         if (steamPath is null)
             return [];
+
+        // Who "me" is, to tell family-shared installs apart: the logged-in SteamID if known, else
+        // the account Steam last signed in with.
+        if (string.IsNullOrWhiteSpace(mySteamId64))
+            mySteamId64 = FindMostRecentSteamId(steamPath);
 
         var games = new List<SteamAppInfo>();
         foreach (var libraryFolder in GetLibraryFolders(steamPath))
@@ -52,7 +58,7 @@ public sealed class SteamLibraryService
 
             foreach (var manifestFile in Directory.GetFiles(steamAppsDir, "appmanifest_*.acf"))
             {
-                if (ParseAppManifest(manifestFile) is { } app)
+                if (ParseAppManifest(manifestFile, mySteamId64) is { } app)
                     games.Add(app);
             }
         }
@@ -169,7 +175,7 @@ public sealed class SteamLibraryService
             }
 
             var name = app.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
-            games.Add(new SteamAppInfo(appId, string.IsNullOrWhiteSpace(name) ? "Unknown" : name));
+            games.Add(new SteamAppInfo(appId, string.IsNullOrWhiteSpace(name) ? "Unknown" : name, IsFamilyShared: true));
         }
 
         return games;
@@ -341,14 +347,42 @@ public sealed class SteamLibraryService
         return folders;
     }
 
-    private static SteamAppInfo? ParseAppManifest(string manifestPath)
+    private static SteamAppInfo? ParseAppManifest(string manifestPath, string? mySteamId64)
     {
         var content = File.ReadAllText(manifestPath);
         var appIdMatch = Regex.Match(content, "\"appid\"\\s*\"(\\d+)\"", RegexOptions.IgnoreCase);
         var nameMatch = Regex.Match(content, "\"name\"\\s*\"([^\"]+)\"");
+        if (!appIdMatch.Success || !nameMatch.Success)
+            return null;
 
-        return appIdMatch.Success && nameMatch.Success
-            ? new SteamAppInfo(appIdMatch.Groups[1].Value, nameMatch.Groups[1].Value)
-            : null;
+        // LastOwner = the account whose license the install uses: another family member's SteamID
+        // for a family-shared game (checked against real installs with tools/detect-games.ps1).
+        var ownerMatch = Regex.Match(content, "\"LastOwner\"\\s*\"(\\d+)\"", RegexOptions.IgnoreCase);
+        var isFamilyShared = ownerMatch.Success && ownerMatch.Groups[1].Value != "0" &&
+                             !string.IsNullOrWhiteSpace(mySteamId64) && ownerMatch.Groups[1].Value != mySteamId64;
+
+        return new SteamAppInfo(appIdMatch.Groups[1].Value, nameMatch.Groups[1].Value, isFamilyShared);
+    }
+
+    /// <summary>The SteamID64 marked MostRecent in Steam's config/loginusers.vdf, or null.</summary>
+    private static string? FindMostRecentSteamId(string steamPath)
+    {
+        try
+        {
+            var path = Path.Combine(steamPath.Replace('/', '\\'), "config", "loginusers.vdf");
+            if (!File.Exists(path))
+                return null;
+
+            foreach (Match user in Regex.Matches(File.ReadAllText(path), "\"(\\d{17})\"\\s*\\{([^}]*)\\}"))
+            {
+                if (Regex.IsMatch(user.Groups[2].Value, "\"MostRecent\"\\s*\"1\""))
+                    return user.Groups[1].Value;
+            }
+        }
+        catch (IOException)
+        {
+        }
+
+        return null;
     }
 }

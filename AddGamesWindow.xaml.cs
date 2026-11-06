@@ -252,15 +252,29 @@ public partial class AddGamesWindow : Window
         {
             var steamGames = fullLibrary
                 ? await FetchFullLibraryAsync(settings, webApiKey, hasSession)
-                : _steamLibraryService.GetInstalledGames();
+                : _steamLibraryService.GetInstalledGames(settings.SteamId64);
 
             var existingGames = _libraryService.LoadGames();
             var existingExePaths = existingGames.Select(g => g.ExePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+            // Refresh the family badge on games already in the library too: a family member may
+            // have left, or you may have bought your own copy since.
+            var familyByExePath = steamGames
+                .DistinctBy(sg => sg.AppId)
+                .ToDictionary(sg => SteamExePath(sg.AppId), sg => sg.IsFamilyShared, StringComparer.OrdinalIgnoreCase);
+            foreach (var game in existingGames)
+            {
+                if (familyByExePath.TryGetValue(game.ExePath, out var isFamilyShared))
+                    game.IsFamilyShared = isFamilyShared;
+            }
+
             var newEntries = steamGames
                 .DistinctBy(sg => sg.AppId)
                 .Where(sg => !existingExePaths.Contains(SteamExePath(sg.AppId)))
-                .Select(sg => (Info: sg, Game: new Game { Name = sg.Name, ExePath = SteamExePath(sg.AppId) }))
+                .Select(sg => (Info: sg, Game: new Game
+                {
+                    Name = sg.Name, ExePath = SteamExePath(sg.AppId), IsFamilyShared = sg.IsFamilyShared
+                }))
                 .ToList();
 
             existingGames.AddRange(newEntries.Select(e => e.Game));
@@ -493,6 +507,7 @@ public partial class AddGamesWindow : Window
                     try
                     {
                         game.CoverImagePath = _libraryService.StoreCoverImage(coverPath, game.Name);
+                        game.CoverIsPlaceholder = true;
                         coversAdded = true;
                     }
                     catch (Exception)

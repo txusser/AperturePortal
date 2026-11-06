@@ -1461,6 +1461,35 @@ public partial class MainWindow : Window
         }
 
         _ = CheckForUpdateAsync();
+        _ = AutoFetchMissingArtAsync();
+    }
+
+    /// <summary>
+    /// Optional startup pass (Settings → "Fetch missing art automatically"): fills in SteamGridDB
+    /// art for games without a cover, or with placeholder Game Pass logos. Works on the live
+    /// library on the UI thread (network calls are awaited, not blocking), so nothing else's edits
+    /// to games.json get overwritten by a stale copy.
+    /// </summary>
+    private async Task AutoFetchMissingArtAsync()
+    {
+        try
+        {
+            var settings = _settingsService.Load();
+            if (!settings.AutoFetchMissingArt || string.IsNullOrWhiteSpace(settings.SteamGridDbApiKey))
+                return;
+
+            var games = _games.ToList();
+            var updated = await ArtFetchService.FetchMissingArtAsync(settings.SteamGridDbApiKey, _libraryService, games);
+            if (updated == 0)
+                return;
+
+            _libraryService.SaveGames(_games);
+            _gamesView.Refresh(); // cover paths aren't change-notifying; rebuild the visible tiles
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"Automatic missing-art fetch failed: {ex}");
+        }
     }
 
     private async Task CheckForUpdateAsync()
