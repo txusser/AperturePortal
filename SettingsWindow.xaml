@@ -71,6 +71,25 @@
 
                     <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,20,0,20"/>
 
+                    <TextBlock Text="Game info (IGDB: length, critic scores)" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Twitch Client ID" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="IgdbClientIdTextBox"/>
+                    <TextBlock Text="Twitch Client Secret (stored encrypted)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,10,0,4"/>
+                    <PasswordBox x:Name="IgdbClientSecretBox"/>
+                    <CheckBox x:Name="AutoFetchGameInfoCheckBox" Content="Fetch game info automatically at startup"
+                              Foreground="{StaticResource TextPrimaryBrush}" Margin="0,14,0,0"/>
+                    <Button x:Name="FetchGameInfoButton" Content="Fetch Game Info Now" Height="34"
+                            HorizontalAlignment="Left" Padding="16,0" Margin="0,10,0,0" Click="FetchGameInfoButton_Click"/>
+                    <TextBlock Text="From a free app at dev.twitch.tv. Steam games also get their Steam review score. The first run over a big library takes a few minutes."
+                               FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    <TextBlock x:Name="FetchGameInfoStatusText" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                    <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,20,0,20"/>
+
                     <Button x:Name="RefreshLibraryButton" Content="Refresh Library" Height="34"
                             HorizontalAlignment="Left" Padding="16,0" Click="RefreshLibraryButton_Click"/>
                     <TextBlock Text="Reloads your library from disk and re-checks what's installed - use this if a tile looks out of date."

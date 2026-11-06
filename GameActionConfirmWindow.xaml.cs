@@ -67,6 +67,9 @@ public partial class GameActionConfirmWindow : Window
             HideButton.Content = game.IsHidden ? "Unhide" : "Hide";
         }
 
+        InfoText.Text = GameInfoService.Shared.Get(game)?.Summary() ?? string.Empty;
+        InfoText.Visibility = InfoText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
         HintText.Visibility = isConsoleMode ? Visibility.Visible : Visibility.Collapsed;
         if (isConsoleMode && infoOnly)
         {

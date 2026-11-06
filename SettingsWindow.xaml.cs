@@ -20,6 +20,9 @@ public partial class SettingsWindow : Window
         StartWithWindowsCheckBox.IsChecked = StartupService.IsEnabled();
         LaunchConsoleModeCheckBox.IsChecked = settings.LaunchInConsoleMode;
         AutoFetchMissingArtCheckBox.IsChecked = settings.AutoFetchMissingArt;
+        IgdbClientIdTextBox.Text = settings.IgdbClientId;
+        IgdbClientSecretBox.Password = settings.IgdbClientSecret;
+        AutoFetchGameInfoCheckBox.IsChecked = settings.AutoFetchGameInfo;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -36,6 +39,9 @@ public partial class SettingsWindow : Window
         settings.SteamGridDbApiKey = ApiKeyTextBox.Text.Trim();
         settings.LaunchInConsoleMode = LaunchConsoleModeCheckBox.IsChecked == true;
         settings.AutoFetchMissingArt = AutoFetchMissingArtCheckBox.IsChecked == true;
+        settings.IgdbClientId = IgdbClientIdTextBox.Text.Trim();
+        settings.IgdbClientSecret = IgdbClientSecretBox.Password.Trim();
+        settings.AutoFetchGameInfo = AutoFetchGameInfoCheckBox.IsChecked == true;
         _settingsService.Save(settings);
 
         if (!StartupService.SetEnabled(StartWithWindowsCheckBox.IsChecked == true))
@@ -100,6 +106,37 @@ public partial class SettingsWindow : Window
         finally
         {
             FetchMissingArtButton.IsEnabled = true;
+        }
+    }
+
+    private async void FetchGameInfoButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Uses the credentials as typed, so it works before Save too.
+        var clientId = IgdbClientIdTextBox.Text.Trim();
+        var clientSecret = IgdbClientSecretBox.Password.Trim();
+        if (clientId.Length == 0 || clientSecret.Length == 0)
+        {
+            FetchGameInfoStatusText.Text = "Enter the Twitch Client ID and Secret first.";
+            return;
+        }
+
+        FetchGameInfoButton.IsEnabled = false;
+        try
+        {
+            var games = _libraryService.LoadGames();
+            var progress = new Progress<string>(text => FetchGameInfoStatusText.Text = text);
+            var updated = await GameInfoService.Shared.FetchMissingAsync(clientId, clientSecret, games, progress);
+            FetchGameInfoStatusText.Text = updated == 0
+                ? "Every game already has up-to-date info."
+                : $"Fetched info for {updated} game{(updated == 1 ? "" : "s")}.";
+        }
+        catch (Exception ex)
+        {
+            FetchGameInfoStatusText.Text = $"Fetching game info failed: {ex.Message}";
+        }
+        finally
+        {
+            FetchGameInfoButton.IsEnabled = true;
         }
     }
 }

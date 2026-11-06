@@ -1495,6 +1495,27 @@ public partial class MainWindow : Window
 
         _ = CheckForUpdateAsync();
         _ = AutoFetchMissingArtAsync();
+        _ = AutoFetchGameInfoAsync();
+    }
+
+    /// <summary>Optional startup pass (Settings → "Fetch game info automatically"): length/scores for games without them.</summary>
+    private async Task AutoFetchGameInfoAsync()
+    {
+        try
+        {
+            var settings = _settingsService.Load();
+            if (!settings.AutoFetchGameInfo || string.IsNullOrWhiteSpace(settings.IgdbClientId) ||
+                string.IsNullOrWhiteSpace(settings.IgdbClientSecret))
+            {
+                return;
+            }
+
+            await GameInfoService.Shared.FetchMissingAsync(settings.IgdbClientId, settings.IgdbClientSecret, _games.ToList());
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Write($"Automatic game-info fetch failed: {ex}");
+        }
     }
 
     /// <summary>

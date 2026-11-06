@@ -23,6 +23,18 @@ public class AppSettings
     /// <summary>The same session cookie, DPAPI-encrypted for the current Windows user - what settings.json actually holds.</summary>
     public string SteamLoginSecureCookieProtected { get; set; } = string.Empty;
 
+    /// <summary>Twitch developer app Client ID for IGDB (game length, critic scores) - not secret.</summary>
+    public string IgdbClientId { get; set; } = string.Empty;
+
+    /// <summary>Twitch app Client Secret. In memory only: written to disk encrypted as <see cref="IgdbClientSecretProtected"/>.</summary>
+    public string IgdbClientSecret { get; set; } = string.Empty;
+
+    /// <summary>DPAPI-encrypted <see cref="IgdbClientSecret"/> - what settings.json actually holds.</summary>
+    public string IgdbClientSecretProtected { get; set; } = string.Empty;
+
+    /// <summary>True = at startup, quietly fetch length/score info for games that don't have it yet.</summary>
+    public bool AutoFetchGameInfo { get; set; }
+
     /// <summary>True = at startup, quietly fetch SteamGridDB art for games with no cover (or placeholder art).</summary>
     public bool AutoFetchMissingArt { get; set; }
 
@@ -61,6 +73,9 @@ public class SettingsService
         var json = File.ReadAllText(_settingsFile);
         var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
 
+        if (!string.IsNullOrEmpty(settings.IgdbClientSecretProtected))
+            settings.IgdbClientSecret = Unprotect(settings.IgdbClientSecretProtected);
+
         if (!string.IsNullOrEmpty(settings.SteamLoginSecureCookieProtected))
         {
             settings.SteamLoginSecureCookie = Unprotect(settings.SteamLoginSecureCookieProtected);
@@ -81,6 +96,9 @@ public class SettingsService
         var plainCookie = settings.SteamLoginSecureCookie;
         settings.SteamLoginSecureCookieProtected = Protect(plainCookie);
         settings.SteamLoginSecureCookie = string.Empty;
+        var plainIgdbSecret = settings.IgdbClientSecret;
+        settings.IgdbClientSecretProtected = Protect(plainIgdbSecret);
+        settings.IgdbClientSecret = string.Empty;
 
         try
         {
@@ -90,6 +108,7 @@ public class SettingsService
         finally
         {
             settings.SteamLoginSecureCookie = plainCookie;
+            settings.IgdbClientSecret = plainIgdbSecret;
         }
     }
 

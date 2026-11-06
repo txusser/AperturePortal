@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Confirm" Height="480" Width="520"
+        Title="Confirm" Height="520" Width="520"
         Icon="Assets/AppIcon.ico"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
@@ -22,7 +22,11 @@
                 </Border>
 
                 <TextBlock x:Name="MessageText" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
-                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" Margin="0,0,0,24"/>
+                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" Margin="0,0,0,8"/>
+
+                <!-- Length/scores from GameInfoService, when fetched (Settings → Game info). -->
+                <TextBlock x:Name="InfoText" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440" Margin="0,0,0,20"/>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button x:Name="ConfirmButton" Width="140" Height="42" Margin="0,0,12,0"
