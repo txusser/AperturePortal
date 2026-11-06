@@ -23,7 +23,8 @@ public enum LibraryFilter
     All,
     Installed,
     NotInstalled,
-    RecentlyPlayed
+    RecentlyPlayed,
+    Hidden
 }
 
 public partial class MainWindow : Window
@@ -210,6 +211,10 @@ public partial class MainWindow : Window
         if (obj is not Game game)
             return false;
 
+        // Hidden games only ever show on the Hidden tab, and that tab shows nothing else.
+        if (game.IsHidden != (_currentFilter == LibraryFilter.Hidden))
+            return false;
+
         bool matchesCategory = _currentFilter switch
         {
             LibraryFilter.Installed => game.IsInstalled,
@@ -354,6 +359,7 @@ public partial class MainWindow : Window
             LibraryFilter.Installed => FilterInstalledButton,
             LibraryFilter.NotInstalled => FilterNotInstalledButton,
             LibraryFilter.RecentlyPlayed => FilterRecentButton,
+            LibraryFilter.Hidden => FilterHiddenButton,
             _ => FilterAllButton
         };
 
@@ -1178,6 +1184,12 @@ public partial class MainWindow : Window
                 PopulateCategoriesSubmenu(categoriesMenuItem, game);
             }
 
+            if (button.DataContext is Game shownGame &&
+                menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Tag as string == "HideToggle") is { } hideMenuItem)
+            {
+                hideMenuItem.Header = shownGame.IsHidden ? "Unhide Game" : "Hide Game";
+            }
+
             menu.IsOpen = true;
         }
     }
@@ -1254,6 +1266,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HideGame_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: Game game })
+            ToggleHidden(game);
+    }
+
+    /// <summary>Hides/unhides a game (desktop menu and the Console Mode game dialog) and drops it from or back into the current view.</summary>
+    public void ToggleHidden(Game game)
+    {
+        game.IsHidden = !game.IsHidden;
+        _libraryService.SaveGames(_games);
+        _gamesView.Refresh();
+        _focusedTileIndex = null;
+    }
+
     private void DeleteGame_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: Game game })
@@ -1311,6 +1338,12 @@ public partial class MainWindow : Window
         _isChildDialogOpen = true;
         var confirmed = confirmWindow.ShowDialog() == true;
         _isChildDialogOpen = false;
+
+        if (confirmWindow.HideToggleRequested)
+        {
+            ToggleHidden(game);
+            return false;
+        }
 
         if (!confirmed)
             return false;

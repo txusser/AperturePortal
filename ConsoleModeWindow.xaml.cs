@@ -26,7 +26,7 @@ public partial class ConsoleModeWindow : Window
     // Same order the filter tabs appear in, so LB/RB can step through them as a simple ring.
     private static readonly LibraryFilter[] FilterOrder =
     [
-        LibraryFilter.Installed, LibraryFilter.RecentlyPlayed, LibraryFilter.All, LibraryFilter.NotInstalled
+        LibraryFilter.Installed, LibraryFilter.RecentlyPlayed, LibraryFilter.All, LibraryFilter.NotInstalled, LibraryFilter.Hidden
     ];
 
     private int _columns = 5;
@@ -86,6 +86,7 @@ public partial class ConsoleModeWindow : Window
             LibraryFilter.Installed => FilterInstalledButton,
             LibraryFilter.NotInstalled => FilterNotInstalledButton,
             LibraryFilter.RecentlyPlayed => FilterRecentButton,
+            LibraryFilter.Hidden => FilterHiddenButton,
             _ => FilterAllButton
         };
 
@@ -130,6 +131,7 @@ public partial class ConsoleModeWindow : Window
             LibraryFilter.Installed => FilterInstalledButton,
             LibraryFilter.NotInstalled => FilterNotInstalledButton,
             LibraryFilter.RecentlyPlayed => FilterRecentButton,
+            LibraryFilter.Hidden => FilterHiddenButton,
             _ => FilterAllButton
         };
 

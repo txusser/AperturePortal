@@ -102,6 +102,8 @@
                                      Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
                         <RadioButton x:Name="FilterNotInstalledButton" Content="Not Installed" Tag="NotInstalled" GroupName="LibraryFilter"
                                      Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
+                        <RadioButton x:Name="FilterHiddenButton" Content="Hidden" Tag="Hidden" GroupName="LibraryFilter"
+                                     Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
                     </StackPanel>
                 </DockPanel>
 
@@ -279,6 +281,7 @@
                                                                     <Button.ContextMenu>
                                                                         <ContextMenu Placement="Bottom">
                                                                             <MenuItem Header="Edit Game" Click="EditGame_Click"/>
+                                                                            <MenuItem Header="Hide Game" Tag="HideToggle" Click="HideGame_Click"/>
                                                                             <MenuItem Header="Delete Game" Click="DeleteGame_Click"/>
                                                                             <Separator/>
                                                                             <!-- Populated in code (MoreButton_Click): contents depend on

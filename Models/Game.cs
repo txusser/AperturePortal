@@ -31,6 +31,9 @@ public class Game : INotifyPropertyChanged
     /// <summary>True when the cover is stand-in art (e.g. a Game Pass package's square logo), so "Fetch missing art" replaces it once SteamGridDB has a real grid.</summary>
     public bool CoverIsPlaceholder { get; set; }
 
+    /// <summary>Hidden from every library tab except "Hidden" - for declutter, nothing is deleted.</summary>
+    public bool IsHidden { get; set; }
+
     /// <summary>Steam game playable through Steam Families: the license belongs to another family member. Set by the Steam syncs.</summary>
     public bool IsFamilyShared { get; set; }
 

@@ -47,6 +47,8 @@
                          Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
             <RadioButton x:Name="FilterNotInstalledButton" Content="Not Installed" Tag="NotInstalled" GroupName="ConsoleLibraryFilter"
                          Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
+            <RadioButton x:Name="FilterHiddenButton" Content="Hidden" Tag="Hidden" GroupName="ConsoleLibraryFilter"
+                         Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
         </StackPanel>
 
         <!-- Reflection of the desktop's category chip row: still clickable if a mouse happens to be
