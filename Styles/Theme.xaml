@@ -4,23 +4,32 @@
     <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
     <!-- ===================== Palette ===================== -->
-    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#121016"/>
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#1C1A24"/>
-    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#28242F"/>
-    <SolidColorBrush x:Key="SurfacePressedBrush" Color="#15131A"/>
-    <SolidColorBrush x:Key="BorderBrush" Color="#2E2A38"/>
+    <!-- Gaming OS palette (2026-11 redesign): near-black ground, one cyan accent. Text on the
+         accent is always the dark OnAccentBrush - white on cyan fails contrast. -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#0A0C10"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#151922"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#1D2430"/>
+    <SolidColorBrush x:Key="SurfacePressedBrush" Color="#10131A"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#262D3A"/>
 
-    <SolidColorBrush x:Key="AccentBrush" Color="#7B5CFA"/>
-    <SolidColorBrush x:Key="AccentHoverBrush" Color="#9277FF"/>
-    <SolidColorBrush x:Key="AccentPressedBrush" Color="#6647E0"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#7AD3FF"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#2FA8E8"/>
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#0A0C10"/>
+
+    <SolidColorBrush x:Key="FamilyBrush" Color="#FFB86B"/>
+    <SolidColorBrush x:Key="XboxBrush" Color="#7CF29C"/>
+
+    <FontFamily x:Key="BodyFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="DisplayFont">Bahnschrift SemiBold, Segoe UI Variable Display, Segoe UI</FontFamily>
 
     <SolidColorBrush x:Key="CloseHoverBrush" Color="#E81123"/>
 
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F5F5F7"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#9A96AD"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#EEF1F5"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#9AA3B2"/>
 
-    <CornerRadius x:Key="CardCornerRadius">10</CornerRadius>
-    <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">14</CornerRadius>
+    <CornerRadius x:Key="ControlCornerRadius">10</CornerRadius>
 
     <!-- ===================== Base Button (implicit) ===================== -->
     <Style TargetType="Button">
@@ -75,6 +84,7 @@
     <!-- ===================== Accent Button ===================== -->
     <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -204,6 +214,7 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -386,10 +397,10 @@
 
     <!-- ===================== Library Filter Tab (RadioButton) ===================== -->
     <Style x:Key="FilterTabStyle" TargetType="RadioButton">
-        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
-        <Setter Property="Padding" Value="14,7"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Padding" Value="16,7"/>
+        <Setter Property="FontSize" Value="13"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -397,7 +408,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="{StaticResource ControlCornerRadius}">
+                    <!-- Pill tabs: the active one is solid near-white with dark text (redesign). -->
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="999">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -405,8 +417,8 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceHoverBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource TextPrimaryBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

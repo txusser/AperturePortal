@@ -31,6 +31,9 @@ public class Game : INotifyPropertyChanged
     /// <summary>True when the cover is stand-in art (e.g. a Game Pass package's square logo), so "Fetch missing art" replaces it once SteamGridDB has a real grid.</summary>
     public bool CoverIsPlaceholder { get; set; }
 
+    /// <summary>Marked finished by the user: shows only on the "Finished" tab (unless also hidden).</summary>
+    public bool IsFinished { get; set; }
+
     /// <summary>Hidden from every library tab except "Hidden" - for declutter, nothing is deleted.</summary>
     public bool IsHidden { get; set; }
 
@@ -128,6 +131,10 @@ public class Game : INotifyPropertyChanged
         GamePlatform.Xbox => "XBOX",
         _ => string.Empty
     };
+
+    /// <summary>Badge colour: FAMILY orange, XBOX green, other platforms near-white (all with dark text).</summary>
+    [JsonIgnore]
+    public string PlatformBadgeBrush => IsFamilyShared ? "#FFB86B" : Platform == GamePlatform.Xbox ? "#7CF29C" : "#EEF1F5";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -28,10 +28,13 @@ public partial class GameActionConfirmWindow : Window
 
     // Only the buttons actually shown - info-only mode (see below) collapses CancelButton, and a
     // collapsed button should never be a valid Left/Right landing spot for the gamepad loop.
-    private Button[] Buttons => new[] { ConfirmButton, HideButton, CancelButton }.Where(b => b.Visibility == Visibility.Visible).ToArray();
+    private Button[] Buttons => new[] { ConfirmButton, FinishButton, HideButton, CancelButton }.Where(b => b.Visibility == Visibility.Visible).ToArray();
 
     /// <summary>True when the user picked Hide/Unhide instead of Launch/Install - the caller toggles Game.IsHidden.</summary>
     public bool HideToggleRequested { get; private set; }
+
+    /// <summary>True when the user picked Finished/Not finished - the caller toggles Game.IsFinished.</summary>
+    public bool FinishToggleRequested { get; private set; }
 
     /// <summary>
     /// Normal "Install/Launch this game?" confirmation with both buttons. The gamepad button-legend
@@ -61,10 +64,12 @@ public partial class GameActionConfirmWindow : Window
         {
             CancelButton.Visibility = Visibility.Collapsed;
             HideButton.Visibility = Visibility.Collapsed;
+            FinishButton.Visibility = Visibility.Collapsed;
         }
         else
         {
             HideButton.Content = game.IsHidden ? "Unhide" : "Hide";
+            FinishButton.Content = game.IsFinished ? "Not finished" : "Finished";
         }
 
         InfoText.Text = GameInfoService.Shared.Get(game)?.Summary() ?? string.Empty;
@@ -139,6 +144,13 @@ public partial class GameActionConfirmWindow : Window
     private void ConfirmButton_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = true;
+        Close();
+    }
+
+    private void FinishButton_Click(object sender, RoutedEventArgs e)
+    {
+        FinishToggleRequested = true;
+        DialogResult = false;
         Close();
     }
 

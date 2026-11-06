@@ -6,231 +6,319 @@
         xmlns:local="clr-namespace:ApertureOS"
         xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
         mc:Ignorable="d"
-        Title="Aperture Portal - Console Mode"
+        Title="Gaming OS - Console Mode"
         Icon="Assets/AppIcon.ico"
         WindowStyle="None"
         WindowState="Maximized"
         ResizeMode="NoResize"
         Background="{StaticResource WindowBackgroundBrush}"
+        FontFamily="{StaticResource BodyFont}"
         Cursor="None"
         UseLayoutRounding="True"
         Loaded="Window_Loaded"
         Closed="Window_Closed"
         SizeChanged="Window_SizeChanged"
         PreviewKeyDown="Window_PreviewKeyDown">
-    <Grid Margin="32">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <Window.Resources>
+        <!-- Controller button glyph used in the tab row and the hint bar. -->
+        <Style x:Key="PadKeyStyle" TargetType="Border">
+            <Setter Property="MinWidth" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="CornerRadius" Value="15"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#5B6575"/>
+            <Setter Property="Padding" Value="7,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="PadKeyTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ConsoleTabStyle" TargetType="RadioButton" BasedOn="{StaticResource FilterTabStyle}">
+            <Setter Property="FontSize" Value="19"/>
+            <Setter Property="Padding" Value="22,9"/>
+            <Setter Property="Margin" Value="4,0"/>
+        </Style>
+    </Window.Resources>
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="Console Mode" FontSize="30" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-            <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" HorizontalAlignment="Right"
-                       FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="A / Enter: Launch     B / Esc: Back     LB/RB: Filter     X/Y: Category"/>
-        </DockPanel>
+    <Grid>
+        <!-- ===== Hero: the selected game's art, faded into the background ===== -->
+        <Grid Height="640" VerticalAlignment="Top" IsHitTestVisible="False">
+            <Image x:Name="HeroImage" Stretch="UniformToFill" VerticalAlignment="Top"/>
+            <Rectangle>
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#EB0A0C10" Offset="0"/>
+                        <GradientStop Color="#8C0A0C10" Offset="0.45"/>
+                        <GradientStop Color="#000A0C10" Offset="0.8"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle>
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#000A0C10" Offset="0.45"/>
+                        <GradientStop Color="#FF0A0C10" Offset="1"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+        </Grid>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
-            <!-- No IsChecked="True" here (unlike the desktop window's tabs): FilterTab_Checked needs
-                 _owner and GameListBox, and this window's own Checked event would otherwise fire
-                 mid-InitializeComponent, before either exists. SyncFilterTabToOwner checks the right
-                 tab explicitly once the window has actually finished loading. -->
-            <RadioButton x:Name="FilterInstalledButton" Content="Installed" Tag="Installed" GroupName="ConsoleLibraryFilter"
-                         Style="{StaticResource FilterTabStyle}" Checked="FilterTab_Checked"/>
-            <RadioButton x:Name="FilterRecentButton" Content="Recently Played" Tag="RecentlyPlayed" GroupName="ConsoleLibraryFilter"
-                         Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
-            <RadioButton x:Name="FilterAllButton" Content="All" Tag="All" GroupName="ConsoleLibraryFilter"
-                         Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
-            <RadioButton x:Name="FilterNotInstalledButton" Content="Not Installed" Tag="NotInstalled" GroupName="ConsoleLibraryFilter"
-                         Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
-            <RadioButton x:Name="FilterHiddenButton" Content="Hidden" Tag="Hidden" GroupName="ConsoleLibraryFilter"
-                         Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
-        </StackPanel>
+        <Grid Margin="64,32,64,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Reflection of the desktop's category chip row: still clickable if a mouse happens to be
-             in play, and X/Y step through it as a ring (see CycleCategory) since LB/RB were already
-             taken by the LibraryFilter tabs above. Category management itself stays desktop-only. -->
-        <ItemsControl x:Name="CategoryChipsItemsControl" Grid.Row="2" Margin="0,0,0,20">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <RadioButton Content="{Binding Label}" Tag="{Binding}" GroupName="ConsoleCategoryFilter"
-                                 Style="{StaticResource FilterTabStyle}" Margin="0,0,8,8"
-                                 IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                 Checked="CategoryChip_Checked"/>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+            <!-- ===== Top bar: brand, tabs (LB/RB), date and clock ===== -->
+            <DockPanel Grid.Row="0" LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Viewbox Width="32" Height="32">
+                        <Canvas Width="34" Height="34">
+                            <Ellipse Canvas.Left="2" Canvas.Top="2" Width="30" Height="30" Stroke="{StaticResource AccentBrush}" StrokeThickness="2.5"/>
+                            <Path Data="M17,2 L24,17 M32,17 L17,24 M17,32 L10,17 M2,17 L17,10" Stroke="{StaticResource AccentBrush}"
+                                  StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Gaming OS" FontFamily="{StaticResource DisplayFont}" FontSize="24" Margin="12,0,0,0"
+                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
 
-        <Grid Grid.Row="3">
-        <ListBox x:Name="GameListBox" Background="Transparent" BorderThickness="0"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                 KeyboardNavigation.DirectionalNavigation="None"
-                 Focusable="False"
-                 VirtualizingPanel.IsVirtualizing="True"
-                 VirtualizingPanel.VirtualizationMode="Standard"
-                 VirtualizingPanel.ScrollUnit="Pixel"
-                 ScrollViewer.CanContentScroll="True">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <!-- Virtualized (only tiles in view exist) - a plain WrapPanel built a tile for every
-                         game on each filter change, which took seconds with a full library.
-                         StartAndEndOnly puts leftover width (columns * slot width rarely fills the row
-                         exactly) evenly on both sides, like the old centered WrapPanel; UpdateColumns()
-                         still reads GameListBox.ActualWidth as the full viewport width. -->
-                    <vwp:VirtualizingWrapPanel SpacingMode="StartAndEndOnly"/>
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-
-            <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem">
-                    <Setter Property="Focusable" Value="True"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="ListBoxItem">
-                                <Border x:Name="SelectionBorder" Margin="10" Padding="6"
-                                        BorderThickness="3" BorderBrush="Transparent"
-                                        CornerRadius="14">
-                                    <ContentPresenter/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </ListBox.ItemContainerStyle>
-
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Border Width="210" Height="330" Background="{StaticResource SurfaceBrush}">
-                        <Border.Clip>
-                            <RectangleGeometry Rect="0,0,210,330" RadiusX="12" RadiusY="12"/>
-                        </Border.Clip>
-                        <StackPanel>
-                            <Grid Width="210" Height="288" ClipToBounds="True">
-                                <Image Source="{Binding CoverImagePath, Converter={x:Static local:CoverImageConverter.Instance}}" Width="210" Height="288" Stretch="UniformToFill">
-                                    <Image.Effect>
-                                        <BlurEffect x:Name="CoverBlur" Radius="0"/>
-                                    </Image.Effect>
-                                </Image>
-                                <Border x:Name="Scrim" Background="#99000000" Opacity="0"/>
-
-                                <!-- Mirrors MainWindow's tile badge: only the less-common platforms
-                                     (Epic/GOG/Battle.net/Xbox) show one, Steam/Manual stay quiet. -->
-                                <Border Background="#CC000000" CornerRadius="4" Panel.ZIndex="5"
-                                        Padding="6,3" Margin="8,8,0,0"
-                                        HorizontalAlignment="Left" VerticalAlignment="Top"
-                                        Visibility="{Binding ShowPlatformBadge, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding PlatformBadgeText}" FontSize="11" FontWeight="Bold"
-                                               Foreground="White"/>
-                                </Border>
-
-                                <Border x:Name="PlayBadge" Width="64" Height="64" CornerRadius="32"
-                                        Background="{StaticResource AccentBrush}" Opacity="0"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M 0,0 L 0,24 L 20,12 Z" Fill="White"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                          Margin="5,0,0,0"/>
-                                </Border>
-
-                                <!-- Not-yet-installed Steam games: persistent badge (mirrors MainWindow's
-                                     tile) so the cover art stays visible instead of being fully covered. -->
-                                <Border x:Name="InstallBadge" Width="64" Height="64" CornerRadius="32"
-                                        Background="#CC000000" Panel.ZIndex="5"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        Visibility="{Binding ShowInstallOverlay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Grid>
-                                        <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="22"
-                                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Visibility="{Binding ShowInstallIcon, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                        <TextBlock Text="Installing" FontSize="12"
-                                                   FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   TextAlignment="Center" TextWrapping="Wrap"
-                                                   Visibility="{Binding ShowDownloadProgress, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    </Grid>
-                                </Border>
-                                <Border Height="6" VerticalAlignment="Bottom" Background="#33FFFFFF" Panel.ZIndex="5"
-                                        ClipToBounds="True"
-                                        Visibility="{Binding ShowDownloadProgress, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Border Width="80" Height="6" Background="{StaticResource AccentBrush}" HorizontalAlignment="Left">
-                                        <Border.RenderTransform>
-                                            <TranslateTransform x:Name="LoadingBarTranslate" X="-80"/>
-                                        </Border.RenderTransform>
-                                        <Border.Triggers>
-                                            <EventTrigger RoutedEvent="Loaded">
-                                                <BeginStoryboard>
-                                                    <Storyboard RepeatBehavior="Forever">
-                                                        <DoubleAnimation Storyboard.TargetName="LoadingBarTranslate" Storyboard.TargetProperty="X"
-                                                                         From="-80" To="210" Duration="0:0:1.1"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </EventTrigger>
-                                        </Border.Triggers>
-                                    </Border>
-                                </Border>
-                            </Grid>
-                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14"
-                                       FontWeight="SemiBold" HorizontalAlignment="Center" Margin="6,8,6,6"
-                                       TextTrimming="CharacterEllipsis" TextAlignment="Center"/>
-                        </StackPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="56,0,0,0">
+                    <Border Style="{StaticResource PadKeyStyle}" CornerRadius="6" Margin="0,0,8,0">
+                        <TextBlock Text="LB" Style="{StaticResource PadKeyTextStyle}"/>
                     </Border>
+                    <!-- No IsChecked="True" here: FilterTab_Checked needs _owner and GameListBox, and
+                         would otherwise fire mid-InitializeComponent. SyncFilterTabToOwner checks the
+                         right tab once the window has loaded. -->
+                    <RadioButton x:Name="FilterInstalledButton" Content="Installed" Tag="Installed" GroupName="ConsoleLibraryFilter"
+                                 Style="{StaticResource ConsoleTabStyle}" Checked="FilterTab_Checked"/>
+                    <RadioButton x:Name="FilterBacklogButton" Content="Backlog" Tag="Backlog" GroupName="ConsoleLibraryFilter"
+                                 Style="{StaticResource ConsoleTabStyle}" Checked="FilterTab_Checked"/>
+                    <RadioButton x:Name="FilterFinishedButton" Content="Finished" Tag="Finished" GroupName="ConsoleLibraryFilter"
+                                 Style="{StaticResource ConsoleTabStyle}" Checked="FilterTab_Checked"/>
+                    <RadioButton x:Name="FilterHiddenButton" Content="Hidden" Tag="Hidden" GroupName="ConsoleLibraryFilter"
+                                 Style="{StaticResource ConsoleTabStyle}" Checked="FilterTab_Checked"/>
+                    <Border Style="{StaticResource PadKeyStyle}" CornerRadius="6" Margin="8,0,0,0">
+                        <TextBlock Text="RB" Style="{StaticResource PadKeyTextStyle}"/>
+                    </Border>
+                </StackPanel>
 
-                    <DataTemplate.Triggers>
-                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
-                            <DataTrigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="CoverBlur" Storyboard.TargetProperty="Radius"
-                                                         To="6" Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="Scrim" Storyboard.TargetProperty="Opacity"
-                                                         To="1" Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="PlayBadge" Storyboard.TargetProperty="Opacity"
-                                                         To="1" Duration="0:0:0.12"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </DataTrigger.EnterActions>
-                            <DataTrigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="CoverBlur" Storyboard.TargetProperty="Radius"
-                                                         To="0" Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="Scrim" Storyboard.TargetProperty="Opacity"
-                                                         To="0" Duration="0:0:0.12"/>
-                                        <DoubleAnimation Storyboard.TargetName="PlayBadge" Storyboard.TargetProperty="Opacity"
-                                                         To="0" Duration="0:0:0.12"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </DataTrigger.ExitActions>
-                        </DataTrigger>
-                    </DataTemplate.Triggers>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="DateText" FontSize="19" Foreground="#B4BCC8" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                    <TextBlock x:Name="ClockText" FontFamily="{StaticResource DisplayFont}" FontSize="27"
+                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
 
-        <!-- Shown only when the library has no games at all - mirrors MainWindow's empty state, but
-             no call-to-action button: adding games isn't reachable from this gamepad-only window. -->
-        <StackPanel x:Name="EmptyStatePanel" Visibility="Collapsed"
-                    HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock Text="&#x1F641;" FontSize="72" HorizontalAlignment="Center"/>
-            <TextBlock Text="No games yet" FontSize="26" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" Margin="0,20,0,6"/>
-            <TextBlock Text="Add some games from the desktop view, then come back in here." FontSize="15"
-                       Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-        </StackPanel>
+            <!-- ===== Selected game ===== -->
+            <StackPanel x:Name="HeroPanel" Grid.Row="1" Margin="0,84,0,0" MaxWidth="1100" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                    <Border Background="{StaticResource TextPrimaryBrush}" CornerRadius="4" Padding="9,4" Margin="0,0,10,0">
+                        <TextBlock x:Name="HeroPlatformText" FontSize="13" FontWeight="Bold" Foreground="{StaticResource OnAccentBrush}"/>
+                    </Border>
+                    <Border x:Name="HeroFamilyBadge" Background="{StaticResource FamilyBrush}" CornerRadius="4" Padding="9,4" Visibility="Collapsed">
+                        <TextBlock Text="FAMILY" FontSize="13" FontWeight="Bold" Foreground="{StaticResource OnAccentBrush}"/>
+                    </Border>
+                </StackPanel>
+                <TextBlock x:Name="HeroTitle" FontFamily="{StaticResource DisplayFont}" FontSize="72" Margin="0,14,0,0"
+                           Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" LineHeight="76"/>
+                <TextBlock x:Name="HeroInfoText" FontSize="20" Foreground="#C7CED8" Margin="0,12,0,0" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+
+            <!-- ===== Category chips (X/Y) and count ===== -->
+            <DockPanel Grid.Row="2" Margin="0,36,0,8" LastChildFill="False">
+                <Border DockPanel.Dock="Left" Style="{StaticResource PadKeyStyle}" CornerRadius="6" Margin="0,0,12,8">
+                    <TextBlock Text="X / Y" Style="{StaticResource PadKeyTextStyle}"/>
+                </Border>
+                <!-- Reflection of the desktop's category chips; X/Y step through it as a ring
+                     (see CycleCategory). Category management itself stays desktop-only. -->
+                <ItemsControl x:Name="CategoryChipsItemsControl" DockPanel.Dock="Left">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <RadioButton Content="{Binding Label}" Tag="{Binding}" GroupName="ConsoleCategoryFilter"
+                                         Style="{StaticResource FilterTabStyle}" Margin="0,0,8,8" FontSize="15"
+                                         IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                         Checked="CategoryChip_Checked"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="CountText" DockPanel.Dock="Right" FontSize="17" Foreground="#8C95A4" VerticalAlignment="Center" Margin="0,0,0,8"/>
+            </DockPanel>
+
+            <!-- ===== Game grid ===== -->
+            <Grid Grid.Row="3" Margin="-14,0">
+                <ListBox x:Name="GameListBox" Background="Transparent" BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                         KeyboardNavigation.DirectionalNavigation="None"
+                         Focusable="False"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Standard"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ScrollViewer.CanContentScroll="True">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <!-- Virtualized: only tiles in view exist. UpdateColumns() reads
+                                 GameListBox.ActualWidth against the slot width (236). -->
+                            <vwp:VirtualizingWrapPanel SpacingMode="StartAndEndOnly"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Focusable" Value="True"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <!-- Slot: 10 margin + 4 ring + 4 gap + 200 tile = 236 wide. -->
+                                        <Border x:Name="SelectionRing" Margin="10" Padding="4"
+                                                BorderThickness="4" BorderBrush="Transparent" CornerRadius="20"
+                                                RenderTransformOrigin="0.5,0.5">
+                                            <Border.RenderTransform>
+                                                <ScaleTransform x:Name="RingScale" ScaleX="1" ScaleY="1"/>
+                                            </Border.RenderTransform>
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="SelectionRing" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="RingScale" Storyboard.TargetProperty="ScaleX" To="1.04" Duration="0:0:0.12"/>
+                                                            <DoubleAnimation Storyboard.TargetName="RingScale" Storyboard.TargetProperty="ScaleY" To="1.04" Duration="0:0:0.12"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="RingScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
+                                                            <DoubleAnimation Storyboard.TargetName="RingScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Width="200">
+                                <Grid Width="200" Height="300">
+                                    <Grid.Clip>
+                                        <RectangleGeometry Rect="0,0,200,300" RadiusX="14" RadiusY="14"/>
+                                    </Grid.Clip>
+                                    <Border Background="{StaticResource SurfaceBrush}"/>
+                                    <TextBlock Text="{Binding Name}" Foreground="#5B6575" FontSize="15" TextWrapping="Wrap"
+                                               TextAlignment="Center" VerticalAlignment="Center" Margin="16"/>
+                                    <Image x:Name="Cover" Source="{Binding CoverImagePath, Converter={x:Static local:CoverImageConverter.Instance}}"
+                                           Stretch="UniformToFill"/>
+
+                                    <!-- FAMILY orange / XBOX green / other platforms near-white. -->
+                                    <Border Background="{Binding PlatformBadgeBrush}" CornerRadius="4" Padding="7,3" Margin="0,10,10,0"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Visibility="{Binding ShowPlatformBadge, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="{Binding PlatformBadgeText}" FontSize="11" FontWeight="Bold"
+                                                   Foreground="{StaticResource OnAccentBrush}"/>
+                                    </Border>
+
+                                    <!-- Not installed: the cover stays visible, with a small label and download icon. -->
+                                    <Border Background="#C00A0C10" CornerRadius="6" Padding="8,5" Margin="10,0,0,10"
+                                            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                            Visibility="{Binding ShowInstallIcon, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="White"
+                                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Not installed" FontSize="12" FontWeight="SemiBold" Foreground="White"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="#C00A0C10" CornerRadius="6" Padding="8,5" Margin="10,0,0,14"
+                                            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                            Visibility="{Binding ShowDownloadProgress, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="Installing..." FontSize="12" FontWeight="SemiBold" Foreground="White"/>
+                                    </Border>
+                                    <Border Height="5" VerticalAlignment="Bottom" Background="#33FFFFFF" ClipToBounds="True"
+                                            Visibility="{Binding ShowDownloadProgress, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Border Width="80" Height="5" Background="{StaticResource AccentBrush}" HorizontalAlignment="Left">
+                                            <Border.RenderTransform>
+                                                <TranslateTransform x:Name="LoadingBarTranslate" X="-80"/>
+                                            </Border.RenderTransform>
+                                            <Border.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard RepeatBehavior="Forever">
+                                                            <DoubleAnimation Storyboard.TargetName="LoadingBarTranslate" Storyboard.TargetProperty="X"
+                                                                             From="-80" To="200" Duration="0:0:1.1"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Border.Triggers>
+                                        </Border>
+                                    </Border>
+                                </Grid>
+                                <TextBlock x:Name="NameText" Text="{Binding Name}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="15"
+                                           Margin="2,10,2,2" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                    <Setter TargetName="NameText" Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                    <Setter TargetName="NameText" Property="FontWeight" Value="SemiBold"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Shown when the current tab has no games; adding games isn't reachable from this
+                     controller-only window, so no call-to-action button. -->
+                <StackPanel x:Name="EmptyStatePanel" Visibility="Collapsed"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock x:Name="EmptyStateTitle" Text="Nothing here yet" FontFamily="{StaticResource DisplayFont}" FontSize="30"
+                               Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="EmptyStateText" Text="Add games from the desktop view, then come back in here." FontSize="17"
+                               Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ===== Controller hints ===== -->
+            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,28">
+                <StackPanel.Resources>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="FontSize" Value="17"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Margin" Value="10,0,36,0"/>
+                    </Style>
+                </StackPanel.Resources>
+                <Border Style="{StaticResource PadKeyStyle}"><TextBlock Text="A" Style="{StaticResource PadKeyTextStyle}" Margin="0"/></Border>
+                <TextBlock Text="Open"/>
+                <Border Style="{StaticResource PadKeyStyle}"><TextBlock Text="B" Style="{StaticResource PadKeyTextStyle}" Margin="0"/></Border>
+                <TextBlock Text="Exit Console Mode"/>
+                <Border Style="{StaticResource PadKeyStyle}"><TextBlock Text="LB RB" Style="{StaticResource PadKeyTextStyle}" Margin="0"/></Border>
+                <TextBlock Text="Tabs"/>
+                <Border Style="{StaticResource PadKeyStyle}"><TextBlock Text="X Y" Style="{StaticResource PadKeyTextStyle}" Margin="0"/></Border>
+                <TextBlock Text="Categories"/>
+                <Border Style="{StaticResource PadKeyStyle}"><TextBlock Text="Back + Start" Style="{StaticResource PadKeyTextStyle}" Margin="0"/></Border>
+                <TextBlock Text="Pause menu (in game)"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

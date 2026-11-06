@@ -7,7 +7,7 @@
         xmlns:local="clr-namespace:ApertureOS"
         xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
         mc:Ignorable="d"
-        Title="Aperture Portal" Height="640" Width="960" MinWidth="720" MinHeight="480"
+        Title="Gaming OS" Height="640" Width="960" MinWidth="720" MinHeight="480"
         Icon="Assets/AppIcon.ico"
         Background="{StaticResource WindowBackgroundBrush}"
         WindowStyle="None" ResizeMode="CanResize"
@@ -31,7 +31,7 @@
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                     <Image Source="Assets/Logo.png" Width="18" Height="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="Aperture Portal" Foreground="{StaticResource TextSecondaryBrush}"
+                    <TextBlock Text="Gaming OS" Foreground="{StaticResource TextSecondaryBrush}"
                                FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -91,16 +91,13 @@
                                    IsHitTestVisible="False"/>
                     </Grid>
                     <StackPanel Orientation="Horizontal">
+                        <!-- No IsChecked="True" here: which tab starts checked depends on the saved
+                             LastLibraryFilter setting (see SyncFilterTabToSetting). -->
                         <RadioButton x:Name="FilterInstalledButton" Content="Installed" Tag="Installed" GroupName="LibraryFilter"
                                      Style="{StaticResource FilterTabStyle}" Checked="FilterTab_Checked"/>
-                        <RadioButton x:Name="FilterRecentButton" Content="Recently Played" Tag="RecentlyPlayed" GroupName="LibraryFilter"
+                        <RadioButton x:Name="FilterBacklogButton" Content="Backlog" Tag="Backlog" GroupName="LibraryFilter"
                                      Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
-                        <!-- No IsChecked="True" here: which tab starts checked depends on the saved
-                             LastLibraryFilter setting, so MainWindow() sets it explicitly once
-                             InitializeComponent() has finished (see SyncFilterTabToSetting). -->
-                        <RadioButton x:Name="FilterAllButton" Content="All" Tag="All" GroupName="LibraryFilter"
-                                     Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
-                        <RadioButton x:Name="FilterNotInstalledButton" Content="Not Installed" Tag="NotInstalled" GroupName="LibraryFilter"
+                        <RadioButton x:Name="FilterFinishedButton" Content="Finished" Tag="Finished" GroupName="LibraryFilter"
                                      Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
                         <RadioButton x:Name="FilterHiddenButton" Content="Hidden" Tag="Hidden" GroupName="LibraryFilter"
                                      Style="{StaticResource FilterTabStyle}" Margin="8,0,0,0" Checked="FilterTab_Checked"/>
@@ -281,6 +278,7 @@
                                                                     <Button.ContextMenu>
                                                                         <ContextMenu Placement="Bottom">
                                                                             <MenuItem Header="Edit Game" Click="EditGame_Click"/>
+                                                                            <MenuItem Header="Mark Finished" Tag="FinishToggle" Click="FinishGame_Click"/>
                                                                             <MenuItem Header="Hide Game" Tag="HideToggle" Click="HideGame_Click"/>
                                                                             <MenuItem Header="Delete Game" Click="DeleteGame_Click"/>
                                                                             <Separator/>

@@ -18,12 +18,19 @@ using ApertureOS.Services;
 
 namespace ApertureOS;
 
+/// <summary>The four library tabs (Gaming OS redesign): every game is on exactly one of them.</summary>
 public enum LibraryFilter
 {
-    All,
+    /// <summary>Installed, not finished, not hidden - recently played first.</summary>
     Installed,
-    NotInstalled,
-    RecentlyPlayed,
+
+    /// <summary>Owned, family-shared or Game Pass but not installed, not finished, not hidden.</summary>
+    Backlog,
+
+    /// <summary>Marked finished (and not hidden).</summary>
+    Finished,
+
+    /// <summary>Hidden, whatever else is true.</summary>
     Hidden
 }
 
@@ -77,7 +84,7 @@ public partial class MainWindow : Window
     private readonly SteamLibraryService _steamLibraryService = new();
     private readonly ObservableCollection<Game> _games = new();
     private ICollectionView _gamesView = null!;
-    private LibraryFilter _currentFilter = LibraryFilter.All;
+    private LibraryFilter _currentFilter = LibraryFilter.Installed;
     private Guid? _currentCategoryFilter;
     private List<GameCategory> _categories = [];
     private string _searchText = string.Empty;
@@ -211,15 +218,13 @@ public partial class MainWindow : Window
         if (obj is not Game game)
             return false;
 
-        // Hidden games only ever show on the Hidden tab, and that tab shows nothing else.
-        if (game.IsHidden != (_currentFilter == LibraryFilter.Hidden))
-            return false;
-
+        // Each game sits on exactly one tab: Hidden wins, then Finished, then Installed/Backlog.
         bool matchesCategory = _currentFilter switch
         {
-            LibraryFilter.Installed => game.IsInstalled,
-            LibraryFilter.NotInstalled => !game.IsInstalled,
-            LibraryFilter.RecentlyPlayed => game.LastPlayedAt.HasValue,
+            LibraryFilter.Hidden => game.IsHidden,
+            LibraryFilter.Finished => !game.IsHidden && game.IsFinished,
+            LibraryFilter.Installed => !game.IsHidden && !game.IsFinished && game.IsInstalled,
+            LibraryFilter.Backlog => !game.IsHidden && !game.IsFinished && !game.IsInstalled,
             _ => true
         };
 
@@ -357,10 +362,10 @@ public partial class MainWindow : Window
         var button = _currentFilter switch
         {
             LibraryFilter.Installed => FilterInstalledButton,
-            LibraryFilter.NotInstalled => FilterNotInstalledButton,
-            LibraryFilter.RecentlyPlayed => FilterRecentButton,
+            LibraryFilter.Backlog => FilterBacklogButton,
+            LibraryFilter.Finished => FilterFinishedButton,
             LibraryFilter.Hidden => FilterHiddenButton,
-            _ => FilterAllButton
+            _ => FilterInstalledButton
         };
 
         if (!button.IsChecked!.Value)
@@ -369,13 +374,13 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Alphabetical by default; Recently Played instead sorts by most-recently-launched.</summary>
+    /// <summary>Installed: most recently played first, then A-Z. Everything else: A-Z (Backlog's smart sort orders come with the game-info layer).</summary>
     private void ApplySort(LibraryFilter filter)
     {
         _gamesView.SortDescriptions.Clear();
-        _gamesView.SortDescriptions.Add(filter == LibraryFilter.RecentlyPlayed
-            ? new SortDescription(nameof(Game.LastPlayedAt), ListSortDirection.Descending)
-            : new SortDescription(nameof(Game.Name), ListSortDirection.Ascending));
+        if (filter == LibraryFilter.Installed)
+            _gamesView.SortDescriptions.Add(new SortDescription(nameof(Game.LastPlayedAt), ListSortDirection.Descending));
+        _gamesView.SortDescriptions.Add(new SortDescription(nameof(Game.Name), ListSortDirection.Ascending));
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -1190,6 +1195,12 @@ public partial class MainWindow : Window
                 hideMenuItem.Header = shownGame.IsHidden ? "Unhide Game" : "Hide Game";
             }
 
+            if (button.DataContext is Game finishGame &&
+                menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Tag as string == "FinishToggle") is { } finishMenuItem)
+            {
+                finishMenuItem.Header = finishGame.IsFinished ? "Mark Not Finished" : "Mark Finished";
+            }
+
             menu.IsOpen = true;
         }
     }
@@ -1281,6 +1292,21 @@ public partial class MainWindow : Window
         _focusedTileIndex = null;
     }
 
+    private void FinishGame_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: Game game })
+            ToggleFinished(game);
+    }
+
+    /// <summary>Marks/unmarks a game finished (desktop menu and the game dialog) and refreshes the view.</summary>
+    public void ToggleFinished(Game game)
+    {
+        game.IsFinished = !game.IsFinished;
+        _libraryService.SaveGames(_games);
+        _gamesView.Refresh();
+        _focusedTileIndex = null;
+    }
+
     private void DeleteGame_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: Game game })
@@ -1342,6 +1368,12 @@ public partial class MainWindow : Window
         if (confirmWindow.HideToggleRequested)
         {
             ToggleHidden(game);
+            return false;
+        }
+
+        if (confirmWindow.FinishToggleRequested)
+        {
+            ToggleFinished(game);
             return false;
         }
 

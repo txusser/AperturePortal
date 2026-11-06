@@ -1,6 +1,8 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ApertureOS.Models;
 using ApertureOS.Services;
@@ -26,7 +28,7 @@ public partial class ConsoleModeWindow : Window
     // Same order the filter tabs appear in, so LB/RB can step through them as a simple ring.
     private static readonly LibraryFilter[] FilterOrder =
     [
-        LibraryFilter.Installed, LibraryFilter.RecentlyPlayed, LibraryFilter.All, LibraryFilter.NotInstalled, LibraryFilter.Hidden
+        LibraryFilter.Installed, LibraryFilter.Backlog, LibraryFilter.Finished, LibraryFilter.Hidden
     ];
 
     private int _columns = 5;
@@ -47,6 +49,106 @@ public partial class ConsoleModeWindow : Window
         GameListBox.ItemsSource = _owner.GamesView;
 
         _inputTimer.Tick += InputTimer_Tick;
+        _clockTimer.Tick += (_, _) => UpdateClock();
+    }
+
+    // Top-bar clock; minute precision is all it shows.
+    private readonly DispatcherTimer _clockTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(15) };
+    private string? _heroImagePath;
+
+    private void UpdateClock()
+    {
+        var now = DateTime.Now;
+        ClockText.Text = now.ToString("HH:mm");
+        DateText.Text = now.ToString("ddd d MMM");
+    }
+
+    /// <summary>Count line next to the category chips, and the empty state when the current tab has no games.</summary>
+    private void UpdateCountAndEmptyState()
+    {
+        var count = GameListBox.Items.Count;
+        CountText.Text = count == 1 ? "1 game" : $"{count:N0} games";
+        EmptyStatePanel.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyStateTitle.Text = _owner.Games.Count == 0 ? "No games yet" : "Nothing here yet";
+        EmptyStateText.Text = _owner.Games.Count == 0
+            ? "Add games from the desktop view, then come back in here."
+            : _owner.CurrentFilter switch
+            {
+                LibraryFilter.Finished => "Games you mark as finished show up here.",
+                LibraryFilter.Hidden => "Games you hide show up here.",
+                LibraryFilter.Backlog => "Every game you have is installed.",
+                _ => "No installed games in this category."
+            };
+        if (count == 0)
+            UpdateHero(null);
+    }
+
+    /// <summary>
+    /// Fills the hero area with the selected game: its header art (else its cover) faded into the
+    /// background, platform/family badges, title and the game-info line.
+    /// </summary>
+    private void UpdateHero(Game? game)
+    {
+        HeroPanel.Visibility = game is null ? Visibility.Hidden : Visibility.Visible;
+        if (game is null)
+        {
+            HeroImage.Source = null;
+            _heroImagePath = null;
+            return;
+        }
+
+        HeroTitle.Text = game.Name;
+        HeroPlatformText.Text = CategoryService.GetPlatformDisplayName(game.Platform).ToUpperInvariant();
+        HeroFamilyBadge.Visibility = game.IsFamilyShared ? Visibility.Visible : Visibility.Collapsed;
+
+        var parts = new List<string>();
+        if (GameInfoService.Shared.Get(game)?.Summary() is { Length: > 0 } summary)
+            parts.Add(summary);
+        if (game.LastPlayedAt is { } lastPlayed)
+            parts.Add($"Played {DescribeAgo(lastPlayed)}");
+        if (!game.IsInstalled)
+            parts.Add("Not installed");
+        HeroInfoText.Text = string.Join("  ·  ", parts);
+
+        var artPath = File.Exists(game.HeaderImagePath) ? game.HeaderImagePath
+                    : File.Exists(game.CoverImagePath) ? game.CoverImagePath
+                    : null;
+        if (artPath == _heroImagePath)
+            return;
+
+        _heroImagePath = artPath;
+        HeroImage.Source = artPath is null ? null : LoadHeroImage(artPath);
+    }
+
+    private static BitmapImage? LoadHeroImage(string path)
+    {
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.CacheOption = BitmapCacheOption.OnLoad; // don't lock the file
+            image.DecodePixelWidth = 1920;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static string DescribeAgo(DateTime utc)
+    {
+        var days = (DateTime.Now.Date - utc.ToLocalTime().Date).Days;
+        return days switch
+        {
+            <= 0 => "today",
+            1 => "yesterday",
+            < 30 => $"{days} days ago",
+            _ => utc.ToLocalTime().ToString("d MMM yyyy")
+        };
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -56,14 +158,14 @@ public partial class ConsoleModeWindow : Window
         SyncFilterTabToOwner();
         SyncCategoryChipsToOwner();
         UpdateColumns();
+        UpdateClock();
+        _clockTimer.Start();
         if (GameListBox.Items.Count > 0)
         {
             SelectIndex(0);
         }
 
-        // A one-time check rather than a live subscription: there's no path to add games from
-        // Console Mode itself, so the library's total size can't change while this window is open.
-        EmptyStatePanel.Visibility = _owner.Games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateCountAndEmptyState();
 
         ResetInputTrackers();
         _inputTimer.Start();
@@ -83,11 +185,10 @@ public partial class ConsoleModeWindow : Window
     {
         var button = _owner.CurrentFilter switch
         {
-            LibraryFilter.Installed => FilterInstalledButton,
-            LibraryFilter.NotInstalled => FilterNotInstalledButton,
-            LibraryFilter.RecentlyPlayed => FilterRecentButton,
+            LibraryFilter.Backlog => FilterBacklogButton,
+            LibraryFilter.Finished => FilterFinishedButton,
             LibraryFilter.Hidden => FilterHiddenButton,
-            _ => FilterAllButton
+            _ => FilterInstalledButton
         };
 
         if (!button.IsChecked!.Value)
@@ -107,6 +208,8 @@ public partial class ConsoleModeWindow : Window
         {
             SelectIndex(0);
         }
+
+        UpdateCountAndEmptyState();
     }
 
     private void CategoryChip_Checked(object sender, RoutedEventArgs e)
@@ -120,6 +223,8 @@ public partial class ConsoleModeWindow : Window
         {
             SelectIndex(0);
         }
+
+        UpdateCountAndEmptyState();
     }
 
     private void CycleFilter(int direction)
@@ -128,11 +233,10 @@ public partial class ConsoleModeWindow : Window
         int newIndex = (currentIndex + direction + FilterOrder.Length) % FilterOrder.Length;
         var button = FilterOrder[newIndex] switch
         {
-            LibraryFilter.Installed => FilterInstalledButton,
-            LibraryFilter.NotInstalled => FilterNotInstalledButton,
-            LibraryFilter.RecentlyPlayed => FilterRecentButton,
+            LibraryFilter.Backlog => FilterBacklogButton,
+            LibraryFilter.Finished => FilterFinishedButton,
             LibraryFilter.Hidden => FilterHiddenButton,
-            _ => FilterAllButton
+            _ => FilterInstalledButton
         };
 
         // Setting IsChecked fires FilterTab_Checked, which does the actual filtering/reselection.
@@ -166,6 +270,7 @@ public partial class ConsoleModeWindow : Window
     private void Window_Closed(object sender, EventArgs e)
     {
         _inputTimer.Stop();
+        _clockTimer.Stop();
         _inputTimer.Tick -= InputTimer_Tick;
         _owner.GameSessionEnded -= Owner_GameSessionEnded;
     }
@@ -179,11 +284,11 @@ public partial class ConsoleModeWindow : Window
     {
         // Mirrors the tile width + margin used in the ItemTemplate/ItemContainerStyle below, so
         // Up/Down navigation math lines up with how WrapPanel actually wraps rows: 210 content +
-        // 12 padding (6x2) + 6 border (3x2) + 20 margin (10x2) = 248. This was previously 230,
+        // 8 padding (4x2) + 8 ring (4x2) + 20 margin (10x2) + 200 tile = 236 (redesign; was 248). Previously 230,
         // which overestimated the column count and made Up/Down overshoot past the tile directly
         // above/below. Uses the list's own ActualWidth rather than the window's, since that
         // already excludes the surrounding Grid's margin - the actual space WrapPanel wraps within.
-        const double slotWidth = 248;
+        const double slotWidth = 236;
         _columns = Math.Max(1, (int)(GameListBox.ActualWidth / slotWidth));
     }
 
@@ -311,6 +416,7 @@ public partial class ConsoleModeWindow : Window
         _selectedIndex = index;
         GameListBox.SelectedIndex = index;
         GameListBox.ScrollIntoView(GameListBox.SelectedItem);
+        UpdateHero(GameListBox.SelectedItem as Game);
 
         Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -340,6 +446,16 @@ public partial class ConsoleModeWindow : Window
         _dialogOpen = true;
         var launched = _owner.ConfirmAndActOnGame(game, this);
         _dialogOpen = false;
+
+        // Hide/Finished in the dialog moves the game to another tab: keep selection and counts valid.
+        if (!launched)
+        {
+            if (_selectedIndex >= GameListBox.Items.Count)
+                _selectedIndex = Math.Max(0, GameListBox.Items.Count - 1);
+            if (GameListBox.Items.Count > 0)
+                SelectIndex(_selectedIndex);
+            UpdateCountAndEmptyState();
+        }
 
         // Only a real launch should hide this grid for the game session - installing just kicks
         // off a background download and the user should stay right here to keep browsing/watch

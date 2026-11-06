@@ -86,7 +86,7 @@
                         <StackPanel x:Name="SteamLoggedOutPanel">
                             <Button x:Name="SteamWebLoginButton" Content="Log in via Steam" Height="34"
                                     HorizontalAlignment="Left" Padding="16,0" Click="SteamWebLoginButton_Click"/>
-                            <TextBlock Text="Signs into real Steam in an embedded window - Aperture Portal never sees your password. Identifies your account and unlocks Sync Full Library, including Family Sharing games."
+                            <TextBlock Text="Signs into real Steam in an embedded window - Gaming OS never sees your password. Identifies your account and unlocks Sync Full Library, including Family Sharing games."
                                        FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                        TextWrapping="Wrap" Margin="0,8,0,0"/>
                         </StackPanel>
@@ -172,7 +172,7 @@
 
                     <!-- ===================== Emulators ===================== -->
                     <StackPanel x:Name="EmulatorsPanel" Visibility="Collapsed">
-                        <TextBlock Text="Point Aperture Portal at an emulator's ROM folder to scan it for games, tag them with the console you set below, and fetch art automatically - you review the results before anything's added. Uses your SteamGridDB key from Settings."
+                        <TextBlock Text="Point Gaming OS at an emulator's ROM folder to scan it for games, tag them with the console you set below, and fetch art automatically - you review the results before anything's added. Uses your SteamGridDB key from Settings."
                                    FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" Margin="0,0,0,10"/>
 
@@ -217,7 +217,7 @@
 
                     <!-- ===================== Installed Folders ===================== -->
                     <StackPanel x:Name="InstalledPanel" Visibility="Collapsed">
-                        <TextBlock Text="Point Aperture Portal at folders where you keep PC games that aren't on Steam/Epic/GOG/Battle.net - it scans for executables and lets you review before adding anything. Uses your SteamGridDB key from Settings for cover art."
+                        <TextBlock Text="Point Gaming OS at folders where you keep PC games that aren't on Steam/Epic/GOG/Battle.net - it scans for executables and lets you review before adding anything. Uses your SteamGridDB key from Settings for cover art."
                                    FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" Margin="0,0,0,10"/>
 

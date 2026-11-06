@@ -75,7 +75,7 @@ public partial class OverlayWindow : Window
     private bool _gameSuspended;
 
     /// <summary>
-    /// Reflects whether the game actually got frozen. A non-elevated Aperture Portal can't open
+    /// Reflects whether the game actually got frozen. A non-elevated Gaming OS can't open
     /// thread handles on an elevated (or DRM/anti-tamper-protected) game process, so without this
     /// the menu would just say "Paused" over a game that's still fully running underneath it.
     /// </summary>
@@ -84,7 +84,7 @@ public partial class OverlayWindow : Window
         _gameSuspended = suspended;
         StatusText.Text = suspended
             ? "Paused"
-            : "Couldn't pause: this game may be running with higher privileges than Aperture Portal";
+            : "Couldn't pause: this game may be running with higher privileges than Gaming OS";
         StatusText.Foreground = suspended
             ? (System.Windows.Media.Brush)FindResource("TextSecondaryBrush")
             : (System.Windows.Media.Brush)FindResource("CloseHoverBrush");

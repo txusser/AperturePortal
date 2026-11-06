@@ -48,7 +48,7 @@ public partial class SettingsWindow : Window
         {
             MessageBox.Show(this,
                 "Couldn't update the \"Start with Windows\" setting - see %APPDATA%\\ApertureOS\\error.log for details.",
-                "Aperture Portal", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Gaming OS", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         DialogResult = true;

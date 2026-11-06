@@ -8,12 +8,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <AssemblyTitle>Aperture Portal</AssemblyTitle>
-    <Product>Aperture Portal</Product>
+    <AssemblyTitle>Gaming OS</AssemblyTitle>
+    <Product>Gaming OS</Product>
     <Version>1.1.1</Version>
     <AssemblyVersion>1.1.1.0</AssemblyVersion>
     <FileVersion>1.1.1.0</FileVersion>
-    <Company>Aperture Portal</Company>
+    <Company>Gaming OS</Company>
   </PropertyGroup>
 
   <ItemGroup>
