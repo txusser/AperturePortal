@@ -1,0 +1,341 @@
+#!/usr/bin/env python3
+"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB and Steam reviews.
+
+The artifact database is only writable through Claude Code's ArtifactData tool, so a sync is:
+  1. Claude exports `games` to <work>/export/games/*.json and the versions to <work>/export/versions.json
+  2. this script fetches the sources, merges and writes batches to <work>/out/batch-NN.json
+  3. Claude applies each batch with ArtifactData (if_version pinned) and then meta/sync.
+
+Keys live in the macOS keychain (service "backlog-games"); run `--setup` once in a terminal.
+Python 3 standard library only.
+"""
+import argparse, base64, getpass, json, re, subprocess, sys, time, unicodedata
+import urllib.error, urllib.parse, urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+import os
+
+SERVICE = "backlog-games"
+WORK = Path(os.environ.get("BACKLOG_WORK", Path.home() / "Work/tools/backlog-games"))
+CACHE = Path.home() / ".cache/backlog-games/info.json"
+CACHE_DAYS = 30
+USER_FIELDS = ("status", "queueOrder", "notes", "finishedAt", "addedAt")
+EXIT_FAMILY_EXPIRED = 3
+
+# ---------- keychain ----------
+
+def kc_get(name):
+    r = subprocess.run(["security", "find-generic-password", "-s", SERVICE, "-a", name, "-w"],
+                       capture_output=True, text=True)
+    return r.stdout.strip() or None if r.returncode == 0 else None
+
+def kc_set(name, value):
+    subprocess.run(["security", "add-generic-password", "-U", "-s", SERVICE, "-a", name, "-w", value],
+                   check=True, capture_output=True)
+
+def ask_family_cookie():
+    print("\nSteam Family: inicia sesión en https://store.steampowered.com en el navegador, abre las")
+    print("herramientas de desarrollo → Almacenamiento/Aplicación → Cookies y copia el valor de 'steamLoginSecure'.")
+    raw = getpass.getpass("steamLoginSecure (vacío para saltar): ").strip()
+    if raw:
+        token = urllib.parse.unquote(raw).split("||")[-1]
+        kc_set("steam_family_token", token)
+        print(f"  Guardado; caduca {datetime.fromtimestamp(jwt_exp(token)):%Y-%m-%d %H:%M}.")
+
+def setup():
+    for name, label, secret in [("steam_id", "SteamID64", False), ("steam_key", "Steam Web API key", True),
+                                ("twitch_id", "Twitch Client ID", False), ("twitch_secret", "Twitch Client Secret", True)]:
+        cur = kc_get(name)
+        value = (getpass.getpass if secret else input)(f"{label}{' [ya guardado, Enter para mantener]' if cur else ''}: ").strip()
+        if value:
+            kc_set(name, value)
+    ask_family_cookie()
+
+def jwt_exp(token):
+    try:
+        payload = token.split(".")[1]
+        return json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))).get("exp", 0)
+    except Exception:
+        return 0
+
+# ---------- http ----------
+
+def http_json(url, data=None, headers=None):
+    req = urllib.request.Request(url, data=data.encode() if isinstance(data, str) else data,
+                                 headers={"User-Agent": "backlog-sync/1.0", **(headers or {})})
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 3:
+                time.sleep(2 ** attempt)
+                continue
+            raise
+
+# ---------- sources ----------
+
+def steam_owned(steam_id, key):
+    url = ("https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?" + urllib.parse.urlencode(
+        {"key": key, "steamid": steam_id, "include_appinfo": 1, "include_played_free_games": 1, "format": "json"}))
+    try:
+        games = http_json(url).get("response", {}).get("games")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            sys.exit("Steam rechazó la clave de Web API: vuelve a guardarla con `--setup`.")
+        raise
+    if games is None:
+        sys.exit("Steam devolvió una biblioteca vacía: revisa que los detalles de juego del perfil sean públicos.")
+    return [{"appid": str(g["appid"]), "name": g.get("name") or "Unknown",
+             "playtimeHours": round(g.get("playtime_forever", 0) / 60, 1), "family": False} for g in games]
+
+class FamilyExpired(Exception):
+    pass
+
+def steam_family(token):
+    hdr = {"Origin": "https://store.steampowered.com", "Referer": "https://store.steampowered.com/"}
+    def call(url):
+        try:
+            return http_json(url, headers=hdr).get("response", {})
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                raise FamilyExpired
+            raise
+    base = "https://api.steampowered.com/IFamilyGroupsService/"
+    grp = call(f"{base}GetFamilyGroupForUser/v1/?access_token={token}")
+    gid = str(grp.get("family_groupid") or "0")
+    if grp.get("is_not_member_of_any_group") or gid == "0":
+        return []
+    lib = call(f"{base}GetSharedLibraryApps/v1/?" + urllib.parse.urlencode(
+        {"access_token": token, "family_groupid": gid, "include_own": "false", "include_excluded": "false",
+         "include_free": "false", "include_non_games": "false", "language": "english"}))
+    return [{"appid": str(a["appid"]), "name": a.get("name") or "Unknown", "playtimeHours": None, "family": True}
+            for a in lib.get("apps", []) if not a.get("exclude_reason")]
+
+def igdb_token(cid, secret):
+    return http_json("https://id.twitch.tv/oauth2/token", urllib.parse.urlencode(
+        {"client_id": cid, "client_secret": secret, "grant_type": "client_credentials"}))["access_token"]
+
+def igdb(cid, token, endpoint, body):
+    time.sleep(0.26)  # IGDB allows 4 requests/s
+    return http_json(f"https://api.igdb.com/v4/{endpoint}", body,
+                     {"Client-ID": cid, "Authorization": f"Bearer {token}"})
+
+def steam_reviews(appid):
+    try:
+        s = http_json(f"https://store.steampowered.com/appreviews/{appid}?json=1&language=all"
+                      "&purchase_type=all&num_per_page=0").get("query_summary", {})
+    except Exception:
+        return {}
+    total = s.get("total_reviews") or 0
+    if not total:
+        return {}
+    return {"steamPositive": round(100 * s.get("total_positive", 0) / total), "steamLabel": s.get("review_score_desc")}
+
+def fetch_info(targets, cid, secret, cache):
+    """targets: {key: {"appid"|None, "name"}} -> fills cache[key] with IGDB + review data."""
+    now = time.time()
+    todo = {k: t for k, t in targets.items() if now - cache.get(k, {}).get("fetchedAt", 0) > CACHE_DAYS * 86400}
+    if not todo:
+        return
+    token = igdb_token(cid, secret)
+    ids = {}
+    steam = {t["appid"]: k for k, t in todo.items() if t.get("appid")}
+    uids = list(steam)
+    for i in range(0, len(uids), 400):
+        chunk = ",".join(f'"{u}"' for u in uids[i:i + 400])
+        for row in igdb(cid, token, "external_games",
+                        f"fields game,uid; where external_game_source = 1 & uid = ({chunk}); limit 500;"):
+            ids.setdefault(steam[row["uid"]], row["game"])
+    for k, t in todo.items():
+        if k not in ids:
+            name = t["name"].replace('"', "")
+            rows = igdb(cid, token, "games", f'search "{name}"; fields id; limit 1;')
+            if rows:
+                ids[k] = rows[0]["id"]
+    details, ttb = {}, {}
+    idl = list(set(ids.values()))
+    for i in range(0, len(idl), 400):
+        lst = ",".join(map(str, idl[i:i + 400]))
+        for r in igdb(cid, token, "games", f"fields aggregated_rating,first_release_date,genres.name,game_modes.name; "
+                                          f"where id = ({lst}); limit 500;"):
+            details[r["id"]] = r
+        for r in igdb(cid, token, "game_time_to_beats",
+                      f"fields game_id,hastily,normally,completely; where game_id = ({lst}); limit 500;"):
+            ttb[r["game_id"]] = r
+    hours = lambda s: round(s / 3600, 1) if s else None
+    for n, (k, t) in enumerate(todo.items(), 1):
+        print(f"\r  Info {n}/{len(todo)}", end="", flush=True)
+        info = {"fetchedAt": now}
+        gid = ids.get(k)
+        if gid:
+            d, tb = details.get(gid, {}), ttb.get(gid, {})
+            info.update(mainHours=hours(tb.get("hastily")), extrasHours=hours(tb.get("normally")),
+                        completionistHours=hours(tb.get("completely")),
+                        criticScore=round(d["aggregated_rating"]) if d.get("aggregated_rating") else None,
+                        genres=[g["name"] for g in d.get("genres", [])],
+                        modes=[m["name"] for m in d.get("game_modes", [])],
+                        releaseYear=datetime.fromtimestamp(d["first_release_date"], timezone.utc).year
+                        if d.get("first_release_date") else None)
+        if t.get("appid"):
+            info.update(steam_reviews(t["appid"]))
+        cache[k] = info
+    print()
+
+# ---------- merge ----------
+
+def norm(name):
+    s = unicodedata.normalize("NFKD", name.lower().replace("™", "").replace("®", ""))
+    return re.sub(r"[^a-z0-9]+", " ", s.encode("ascii", "ignore").decode()).strip()
+
+def suggests_evergreen(info):
+    genres, modes = set(info.get("genres") or []), set(info.get("modes") or [])
+    multiplayer_only = modes and "Single player" not in modes
+    endless_modes = {"Battle Royale", "Massively Multiplayer Online (MMO)"} & modes
+    return bool({"Simulator", "MOBA", "Sport", "Racing"} & genres or endless_modes or multiplayer_only)
+
+def clean(d):
+    return {k: v for k, v in d.items() if v is not None}
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--setup", action="store_true", help="guardar o cambiar claves en el llavero (interactivo)")
+    ap.add_argument("--family-login", action="store_true", help="volver a pegar la cookie de Steam (interactivo)")
+    ap.add_argument("--no-family", action="store_true", help="saltar Steam Family")
+    ap.add_argument("--limit", type=int, help="solo los N juegos de Steam con más horas (para probar)")
+    ap.add_argument("--dry-run", action="store_true", help="mostrar el resumen sin escribir lotes")
+    a = ap.parse_args()
+    if a.setup:
+        return setup()
+    if a.family_login:
+        return ask_family_cookie()
+
+    keys = {n: kc_get(n) for n in ("steam_id", "steam_key", "twitch_id", "twitch_secret")}
+    if not all(keys.values()):
+        sys.exit("Faltan claves en el llavero: ejecuta `python3 sync_backlog.py --setup` en una terminal.")
+
+    export = WORK / "export"
+    existing = {p.stem: json.loads(p.read_text()) for p in (export / "games").glob("*.json")}
+    versions = json.loads((export / "versions.json").read_text())
+
+    print("Steam: biblioteca…")
+    steam = sorted(steam_owned(keys["steam_id"], keys["steam_key"]), key=lambda g: -g["playtimeHours"])
+    owned = {g["appid"] for g in steam}
+    family, family_note = [], "familia omitida"
+    if not a.no_family:
+        token = kc_get("steam_family_token")
+        if not token or jwt_exp(token) < time.time() + 60:
+            print("El token de Steam Family falta o ha caducado: ejecuta `python3 sync_backlog.py --family-login`.")
+            sys.exit(EXIT_FAMILY_EXPIRED)
+        try:
+            family = [g for g in steam_family(token) if g["appid"] not in owned]
+            family_note = "familia"
+        except FamilyExpired:
+            print("Steam rechazó el token de Family: ejecuta `python3 sync_backlog.py --family-login`.")
+            sys.exit(EXIT_FAMILY_EXPIRED)
+    synced = steam + family
+    if a.limit:
+        synced = steam[:a.limit] + family[:max(1, a.limit // 5)]
+    print(f"  {len(steam)} propios, {len(family)} de la familia; procesando {len(synced)}.")
+
+    # Non-Steam docs that still need info (seeds, manual, unmatched) are looked up by name.
+    by_norm = {norm(g["name"]): did for did, g in existing.items() if not did.startswith("steam-")}
+    synced_norms = {norm(g["name"]) for g in synced}
+    targets = {f"steam:{g['appid']}": {"appid": g["appid"], "name": g["name"]} for g in synced}
+    for did, g in existing.items():
+        if not did.startswith("steam-") and g.get("needsInfo") and norm(g["name"]) not in synced_norms:
+            targets[f"name:{norm(g['name'])}"] = {"name": g["name"]}
+
+    print("IGDB y reseñas…")
+    cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
+    try:
+        fetch_info(targets, keys["twitch_id"], keys["twitch_secret"], cache)
+    finally:
+        CACHE.parent.mkdir(parents=True, exist_ok=True)
+        CACHE.write_text(json.dumps(cache))
+
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    info_fields = ("mainHours", "extrasHours", "completionistHours", "criticScore", "steamPositive", "steamLabel",
+                   "genres", "releaseYear")
+    writes, stats = [], {"nuevos": 0, "actualizados": 0, "fusionados": 0, "solo_info": 0}
+
+    def put(op, did, data):
+        e = {"op": op, "collection": "games", "doc_id": did}
+        if data is not None:
+            e["data"] = data
+        if did in versions:
+            e["if_version"] = versions[did]
+        writes.append(e)
+
+    for g in synced:
+        did = f"steam-{g['appid']}"
+        info = cache.get(f"steam:{g['appid']}", {})
+        data = clean({"name": g["name"], "platform": "steam", "family": g["family"], "steamAppId": g["appid"],
+                      "playtimeHours": g["playtimeHours"], "source": "sync",
+                      **{f: info.get(f) for f in info_fields}})
+        data["needsInfo"] = not info.get("mainHours") and not info.get("criticScore")
+        if did in existing:
+            put("update", did, data)
+            stats["actualizados"] += 1
+            continue
+        old_id = by_norm.pop(norm(g["name"]), None)
+        if old_id:
+            old = existing[old_id]
+            data.update({f: old[f] for f in USER_FIELDS if f in old})
+            put("set", did, data)
+            put("delete", old_id, None)
+            stats["fusionados"] += 1
+        else:
+            data.update(status="evergreen" if suggests_evergreen(info) else "backlog", addedAt=now, notes="")
+            put("set", did, data)
+            stats["nuevos"] += 1
+
+    for key, t in targets.items():
+        if key.startswith("name:"):
+            did = by_norm[key[5:]]
+            info = cache.get(key, {})
+            data = clean({f: info.get(f) for f in info_fields if f not in ("steamPositive", "steamLabel")})
+            if data:
+                data["needsInfo"] = not data.get("mainHours") and not data.get("criticScore")
+                put("update", did, data)
+                stats["solo_info"] += 1
+
+    print("\nResumen:", ", ".join(f"{v} {k}" for k, v in stats.items()))
+    for e in writes:
+        if e["op"] != "update":
+            print(f"  {e['op']:6} {e['doc_id']:40} {e.get('data', {}).get('name', '')} {e.get('data', {}).get('status', '')}")
+    if a.dry_run:
+        return
+
+    out = WORK / "out"
+    out.mkdir(exist_ok=True)
+    docs = out / "docs"
+    docs.mkdir(exist_ok=True)
+    for old in [*out.glob("*.json"), *docs.glob("*.json")]:
+        old.unlink()
+    for e in writes:  # ArtifactData reads each document from its own file (file_path)
+        if "data" in e:
+            path = docs / f"{e['doc_id']}.json"
+            path.write_text(json.dumps(e.pop("data"), ensure_ascii=False))
+            e["file_path"] = str(path)
+    # A merge's set + delete must land in the same batch: start a new one if the pair would straddle.
+    batches, cur = [], []
+    for i, e in enumerate(writes):
+        pair = e["op"] == "set" and i + 1 < len(writes) and writes[i + 1]["op"] == "delete"
+        if len(cur) + (2 if pair else 1) > 50:
+            batches.append(cur)
+            cur = []
+        cur.append(e)
+    if cur:
+        batches.append(cur)
+    for n, b in enumerate(batches, 1):
+        (out / f"batch-{n:02}.json").write_text(json.dumps(b, ensure_ascii=False))
+    total = len(steam) + len(family)
+    meta = {"lastSyncAt": now, "source": "Steam + " + family_note,
+            "counts": {"steam": len(steam), "family": len(family), "processed": len(synced), **stats},
+            "partial": bool(a.limit and len(synced) < total)}
+    (out / "meta-sync.json").write_text(json.dumps(meta, ensure_ascii=False))
+    print(f"\n{len(batches)} lote(s) en {out}")
+
+if __name__ == "__main__":
+    main()
