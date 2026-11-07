@@ -92,11 +92,11 @@ def steam_owned(steam_id, key):
 class FamilyExpired(Exception):
     pass
 
-def steam_family(token):
+def steam_family(token, steam_id):
     hdr = {"Origin": "https://store.steampowered.com", "Referer": "https://store.steampowered.com/"}
-    def call(url):
+    def call(url, data=None):
         try:
-            return http_json(url, headers=hdr).get("response", {})
+            return http_json(url, data, headers=hdr).get("response", {})
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):
                 raise FamilyExpired
@@ -109,7 +109,12 @@ def steam_family(token):
     lib = call(f"{base}GetSharedLibraryApps/v1/?" + urllib.parse.urlencode(
         {"access_token": token, "family_groupid": gid, "include_own": "false", "include_excluded": "false",
          "include_free": "false", "include_non_games": "false", "language": "english"}))
-    return [{"appid": str(a["appid"]), "name": a.get("name") or "Unknown", "playtimeHours": None, "family": True}
+    # Your own hours on borrowed games: the family playtime summary (POST only), filtered to your Steam ID.
+    played = {str(e["appid"]): e.get("seconds_played", 0) for e in call(
+        f"{base}GetPlaytimeSummary/v1/?access_token={token}&family_groupid={gid}", b"").get("entries", [])
+        if e.get("steamid") == steam_id}
+    return [{"appid": str(a["appid"]), "name": a.get("name") or "Unknown", "family": True,
+             "playtimeHours": round(played[str(a["appid"])] / 3600, 1) if str(a["appid"]) in played else None}
             for a in lib.get("apps", []) if not a.get("exclude_reason")]
 
 def igdb_token(cid, secret):
@@ -258,7 +263,7 @@ def main():
             print("El token de Steam Family falta o ha caducado: ejecuta `python3 sync_backlog.py --family-login`.")
             sys.exit(EXIT_FAMILY_EXPIRED)
         try:
-            family = [g for g in steam_family(token) if g["appid"] not in owned]
+            family = [g for g in steam_family(token, keys["steam_id"]) if g["appid"] not in owned]
             family_note = "familia"
         except FamilyExpired:
             print("Steam rechazó el token de Family: ejecuta `python3 sync_backlog.py --family-login`.")
