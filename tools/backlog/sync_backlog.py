@@ -216,7 +216,8 @@ def main():
 
     export = WORK / "export"
     existing = {p.stem: json.loads(p.read_text()) for p in (export / "games").glob("*.json")}
-    versions = json.loads((export / "versions.json").read_text())
+    vfile = export / "versions.json"
+    versions = json.loads(vfile.read_text()) if vfile.exists() else {}
 
     print("Steam: biblioteca…")
     steam = sorted(steam_owned(keys["steam_id"], keys["steam_key"]), key=lambda g: -g["playtimeHours"])
@@ -257,7 +258,14 @@ def main():
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     info_fields = ("mainHours", "extrasHours", "completionistHours", "criticScore", "steamPositive", "steamLabel",
                    "genres", "releaseYear")
-    writes, stats = [], {"nuevos": 0, "actualizados": 0, "fusionados": 0, "solo_info": 0}
+    writes, stats = [], {"nuevos": 0, "actualizados": 0, "fusionados": 0, "solo_info": 0, "sin_cambios": 0}
+
+    def put_changes(did, data, stat):
+        """Update only the fields that differ from the exported doc; skip it when nothing changed."""
+        diff = {k: v for k, v in data.items() if existing[did].get(k) != v}
+        if diff:
+            put("update", did, diff)
+        stats[stat if diff else "sin_cambios"] += 1
 
     def put(op, did, data):
         e = {"op": op, "collection": "games", "doc_id": did}
@@ -275,8 +283,7 @@ def main():
                       **{f: info.get(f) for f in info_fields}})
         data["needsInfo"] = not info.get("mainHours") and not info.get("criticScore")
         if did in existing:
-            put("update", did, data)
-            stats["actualizados"] += 1
+            put_changes(did, data, "actualizados")
             continue
         old_id = by_norm.pop(norm(g["name"]), None)
         if old_id:
@@ -297,13 +304,15 @@ def main():
             data = clean({f: info.get(f) for f in info_fields if f not in ("steamPositive", "steamLabel")})
             if data:
                 data["needsInfo"] = not data.get("mainHours") and not data.get("criticScore")
-                put("update", did, data)
-                stats["solo_info"] += 1
+                put_changes(did, data, "solo_info")
 
     print("\nResumen:", ", ".join(f"{v} {k}" for k, v in stats.items()))
     for e in writes:
         if e["op"] != "update":
             print(f"  {e['op']:6} {e['doc_id']:40} {e.get('data', {}).get('name', '')} {e.get('data', {}).get('status', '')}")
+    unpinned = [e["doc_id"] for e in writes if e["doc_id"] in existing and "if_version" not in e]
+    if unpinned:
+        print(f"\nSin versión ({len(unpinned)}), leerlas antes de aplicar: {' '.join(unpinned)}")
     if a.dry_run:
         return
 
