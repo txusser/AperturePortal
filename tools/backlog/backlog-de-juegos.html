@@ -106,6 +106,10 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
 .badge.pending { background: rgba(245,158,11,0.12); color: var(--amber); }
 .facts { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; color: var(--muted); }
 .facts b { font-family: var(--mono); color: var(--fg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.prog { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.prog .bar { flex: 1; max-width: 260px; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.prog .fill { height: 100%; background: var(--blue); }
+.row.s-paused .prog .fill { background: var(--amber); }
 .note { font-size: 12px; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
 .actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .act { border: 0; background: transparent; border-radius: 4px; height: 28px; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: background 0.1s; }
@@ -275,6 +279,14 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     if (g.genres && g.genres.length) f.push(`<span>${esc(g.genres.slice(0, 3).join(', '))}</span>`);
     return f.join('');
   }
+  // Played hours vs story + extras (falls back to story only) for games in progress.
+  function progress(g) {
+    if (!['playing', 'paused'].includes(g.status)) return '';
+    const goal = num(g.extrasHours) ?? num(g.mainHours), played = num(g.playtimeHours) || 0;
+    if (!goal) return '';
+    const pct = Math.min(100, Math.round(played / goal * 100));
+    return `<div class="prog" title="Jugado frente a historia${num(g.extrasHours) != null ? ' + extras' : ''}"><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span>${fmtH(played)} / ${fmtH(goal)} · ${pct}%</span></div>`;
+  }
   function actions(g, i, total) {
     const s = g.status || 'backlog';
     const a = [];
@@ -325,6 +337,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
         <div class="main">
           <div class="title"><span class="name">${esc(g.name)}</span>${badges(g)}</div>
           ${facts(g) ? `<div class="facts">${facts(g)}</div>` : ''}
+          ${progress(g)}
           ${g.notes && state.editing !== g.id ? `<div class="note">${esc(g.notes)}</div>` : ''}
         </div>
         <div class="actions">${actions(g, i, list.length)}</div>
