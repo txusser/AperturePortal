@@ -1,0 +1,390 @@
+<title>Backlog de juegos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* ESportsArena (Jesús's design system): red/black/electric blue, angular radii, glow shadows, compact 4px spacing.
+   Layout: one column — header with totals, tab row, toolbar, then a dense list of game rows (stacks on phones). */
+:root {
+  --bg: #0A0A0A;
+  --surface: #141414;
+  --surface-2: #1E1E1E;
+  --line: #2E2E2E;
+  --fg: #F5F5F5;
+  --muted: #A3A3A3;
+  --faint: #8A8A8A;
+  --red: #DC2626;
+  --red-hover: #B91C1C;
+  --blue: #2563EB;
+  --blue-text: #60A5FA;
+  --green: #22C55E;
+  --amber: #F59E0B;
+  --err-text: #F87171;
+  --glow-sm: 0 0 4px rgba(220,38,38,0.25);
+  --glow: 0 0 10px rgba(220,38,38,0.30);
+  --glow-blue: 0 0 10px rgba(37,99,235,0.30);
+  --display: "Anton", "Impact", "Arial Narrow", sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+/* Header */
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { flex: none; filter: drop-shadow(0 0 6px rgba(220,38,38,0.45)); }
+h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(36px, 6vw, 48px); line-height: 1.05; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; }
+.sync { font-size: 12px; color: var(--faint); margin-top: 4px; }
+.totals { display: flex; flex-wrap: wrap; gap: 24px; }
+.total { display: flex; flex-direction: column; gap: 2px; }
+.total b { font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.total:first-child b { color: var(--red); text-shadow: 0 0 10px rgba(220,38,38,0.35); }
+.total span { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Tabs */
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tab { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: 6px 14px; border-radius: 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; height: 36px; transition: background 0.1s, box-shadow 0.15s; }
+.tab:hover { background: var(--surface-2); color: var(--fg); }
+.tab[aria-selected="true"] { background: var(--red); border-color: var(--red); color: #FFFFFF; box-shadow: var(--glow-sm); }
+.tab .n { font-family: var(--mono); font-weight: 400; font-size: 12px; opacity: 0.8; }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 10px; height: 36px; }
+.search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; }
+.search:hover { border-color: var(--red); }
+.search:focus-within { border: 2px solid var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,0.2); padding: 0 9px; }
+select { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; height: 36px; padding: 0 28px 0 10px; }
+select:hover { border-color: var(--red); }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip { background: var(--surface); border: 1px solid var(--line); color: var(--muted); padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; height: 28px; }
+.chip:hover { color: var(--fg); }
+.chip[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #FFFFFF; }
+.btn { border-radius: 4px; height: 36px; padding: 0 16px; font-size: 14px; font-weight: 600; border: 1px solid var(--blue); background: transparent; color: var(--blue-text); transition: background 0.1s, box-shadow 0.15s; }
+.btn:hover { background: rgba(37,99,235,0.08); box-shadow: var(--glow-blue); }
+.btn.primary { background: var(--red); border-color: var(--red); color: #FFFFFF; }
+.btn.primary:hover { background: var(--red-hover); box-shadow: var(--glow-sm); }
+
+/* Add form */
+form.add { display: grid; grid-template-columns: 2fr 1fr auto auto; gap: 8px; align-items: center; background: var(--surface-2); border: 1px solid rgba(220,38,38,0.25); border-radius: 4px; padding: 16px; box-shadow: var(--glow); }
+form.add input[type=text] { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; height: 36px; padding: 0 10px; min-width: 0; }
+form.add input[type=text]:focus { outline: none; border: 2px solid var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,0.2); padding: 0 9px; }
+form.add label.check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 16px; }
+@media (max-width: 640px) { form.add { grid-template-columns: 1fr; } }
+
+/* List: dense rows; the queue is red-coded, "playing" blue-coded (one team colour per row). */
+.list { display: flex; flex-direction: column; gap: 4px; }
+.row { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 4px; padding: 10px 12px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; transition: border-color 0.1s, box-shadow 0.15s; }
+.row:hover { border-color: #3A3A3A; background: var(--surface-2); }
+.row.s-next { border-left-color: var(--red); }
+.row.s-next:hover { box-shadow: var(--glow); border-color: rgba(220,38,38,0.4); border-left-color: var(--red); }
+.row.s-playing { border-left-color: var(--blue); }
+.row.s-evergreen { border-left-color: var(--green); }
+.row.s-playing:hover { box-shadow: var(--glow-blue); border-color: rgba(37,99,235,0.4); border-left-color: var(--blue); }
+.pos { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--muted); width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.pos.top { color: var(--red); }
+.pos.none { width: 0; }
+.main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.badge { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 2px; text-transform: uppercase; background: rgba(245,245,245,0.08); color: var(--fg); }
+.badge.family { background: rgba(37,99,235,0.18); color: var(--blue-text); }
+.badge.xbox { background: rgba(34,197,94,0.14); color: var(--green); }
+.badge.pending { background: rgba(245,158,11,0.12); color: var(--amber); }
+.facts { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; color: var(--muted); }
+.facts b { font-family: var(--mono); color: var(--fg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.note { font-size: 12px; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.act { border: 0; background: transparent; border-radius: 4px; height: 28px; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: background 0.1s; }
+.act:hover { background: var(--surface-2); color: var(--fg); }
+.row:hover .act:hover { background: #2A2A2A; }
+.act.go { background: var(--red); color: #FFFFFF; font-weight: 600; }
+.act.go:hover, .row:hover .act.go:hover { background: var(--red-hover); box-shadow: var(--glow-sm); }
+.row.s-playing .act.go { background: transparent; color: var(--blue-text); border: 1px solid var(--blue); }
+.row.s-playing .act.go:hover { background: rgba(37,99,235,0.08); box-shadow: var(--glow-blue); }
+.icon { font-family: var(--mono); padding: 0 8px; border: 1px solid var(--line); }
+.editor { grid-column: 1 / -1; display: flex; gap: 8px; }
+.editor textarea { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; resize: vertical; min-height: 40px; }
+.editor textarea:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,0.2); }
+@media (max-width: 640px) {
+  .row { grid-template-columns: auto minmax(0, 1fr); }
+  .actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* Empty + status */
+.empty { border: 1px dashed var(--line); border-radius: 4px; padding: 32px 16px; text-align: center; color: var(--muted); }
+.empty h2 { margin: 0 0 4px; font-family: var(--display); font-size: 28px; font-weight: 400; text-transform: uppercase; color: var(--fg); }
+.status { font-size: 12px; color: var(--faint); }
+.status.err { color: var(--err-text); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15" fill="none" stroke="#DC2626" stroke-width="2.5"/><path d="M17 2 L24 17 M32 17 L17 24 M17 32 L10 17 M2 17 L17 10" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <h1>Backlog de juegos</h1>
+      </div>
+      <div class="sync" id="sync">Sin sincronizar todavía · los juegos se añaden a mano o con la sincronización desde el Mac</div>
+    </div>
+    <div class="totals" aria-live="polite">
+      <div class="total" title="Cola, backlog y jugando; los evergreen no cuentan"><b id="t-pending">0</b><span>Por jugar</span></div>
+      <div class="total"><b id="t-hours">—</b><span>Horas de historia</span></div>
+      <div class="total"><b id="t-finished">0</b><span>Terminados este año</span></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Estado" id="tabs"></nav>
+
+  <div class="toolbar">
+    <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A3A3A3" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Buscar juego" aria-label="Buscar juego"></label>
+    <select id="sort" aria-label="Ordenar">
+      <option value="quick">Victorias rápidas</option>
+      <option value="short">Más cortos</option>
+      <option value="rated">Mejor valorados</option>
+      <option value="recent">Añadidos recientemente</option>
+      <option value="az">A–Z</option>
+    </select>
+    <div class="chips" id="platforms" role="group" aria-label="Plataforma"></div>
+    <button class="btn primary" id="add-toggle" type="button">+ Añadir juego</button>
+  </div>
+
+  <form class="add" id="add-form" hidden>
+    <input id="add-name" type="text" placeholder="Nombre del juego" aria-label="Nombre del juego" required>
+    <select id="add-platform" aria-label="Plataforma">
+      <option value="steam">Steam</option>
+      <option value="xbox">Xbox</option>
+      <option value="gamepass">Game Pass</option>
+      <option value="other">Otra</option>
+    </select>
+    <label class="check"><input id="add-family" type="checkbox"> De la familia</label>
+    <button class="btn primary" type="submit">Añadir</button>
+  </form>
+
+  <div class="status" id="status"></div>
+  <div class="list" id="list"></div>
+</div>
+
+<script>
+(function () {
+  const TABS = [
+    { id: 'next', label: 'A continuación' },
+    { id: 'backlog', label: 'Backlog' },
+    { id: 'playing', label: 'Jugando' },
+    { id: 'evergreen', label: 'Evergreen' },
+    { id: 'finished', label: 'Terminados' },
+    { id: 'hidden', label: 'Ocultos' }
+  ];
+  const PLATFORMS = [
+    { id: 'all', label: 'Todos' }, { id: 'steam', label: 'Steam' }, { id: 'family', label: 'Familia' },
+    { id: 'xbox', label: 'Xbox' }, { id: 'gamepass', label: 'Game Pass' }
+  ];
+  const state = { games: [], meta: null, tab: 'backlog', platform: 'all', q: '', sort: 'quick', editing: null, db: null, canWrite: false };
+
+  try { const saved = JSON.parse(localStorage.getItem('backlog-view') || '{}'); Object.assign(state, pick(saved, ['tab', 'platform', 'sort'])); } catch (e) {}
+  function pick(o, keys) { const r = {}; keys.forEach(k => { if (o && o[k]) r[k] = o[k]; }); return r; }
+  function remember() { try { localStorage.setItem('backlog-view', JSON.stringify({ tab: state.tab, platform: state.platform, sort: state.sort })); } catch (e) {} }
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+  const fmtH = h => h == null ? null : (h < 10 ? h.toFixed(1).replace('.0', '') : Math.round(h)) + ' h';
+
+  function rating(g) { return num(g.criticScore) ?? num(g.steamPositive); }
+  function quickScore(g) {
+    const r = rating(g), h = num(g.mainHours);
+    if (r == null || h == null) return -1;
+    return r / Math.log2(h + 2);
+  }
+  function matchesPlatform(g) {
+    switch (state.platform) {
+      case 'family': return !!g.family;
+      case 'steam': return g.platform === 'steam' && !g.family;
+      case 'xbox': return g.platform === 'xbox';
+      case 'gamepass': return g.platform === 'gamepass';
+      default: return true;
+    }
+  }
+  function visible() {
+    const q = state.q.trim().toLowerCase();
+    let list = state.games.filter(g => (g.status || 'backlog') === state.tab && matchesPlatform(g) && (!q || (g.name || '').toLowerCase().includes(q)));
+    if (state.tab === 'next') return list.sort((a, b) => (num(a.queueOrder) ?? 1e9) - (num(b.queueOrder) ?? 1e9));
+    const by = {
+      quick: (a, b) => quickScore(b) - quickScore(a),
+      short: (a, b) => (num(a.mainHours) ?? 1e9) - (num(b.mainHours) ?? 1e9),
+      rated: (a, b) => (rating(b) ?? -1) - (rating(a) ?? -1),
+      recent: (a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')),
+      az: () => 0
+    }[state.sort] || (() => 0);
+    return list.sort((a, b) => by(a, b) || (a.name || '').localeCompare(b.name || '', 'es'));
+  }
+
+  function renderHeader() {
+    const pending = state.games.filter(g => ['next', 'backlog', 'playing'].includes(g.status || 'backlog'));
+    $('t-pending').textContent = pending.length;
+    const hours = pending.reduce((s, g) => s + (num(g.mainHours) || 0), 0);
+    const withHours = pending.filter(g => num(g.mainHours) != null).length;
+    $('t-hours').textContent = withHours ? Math.round(hours).toLocaleString('es-ES') : '—';
+    const year = String(new Date().getFullYear());
+    $('t-finished').textContent = state.games.filter(g => g.status === 'finished' && String(g.finishedAt || '').startsWith(year)).length;
+    const m = state.meta;
+    $('sync').textContent = m && m.lastSyncAt
+      ? 'Última sincronización: ' + new Date(m.lastSyncAt).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }) + (m.source ? ' · ' + m.source : '')
+      : 'Sin sincronizar todavía · los juegos se añaden a mano o con la sincronización desde el Mac';
+
+    $('tabs').innerHTML = TABS.map(t => {
+      const n = state.games.filter(g => (g.status || 'backlog') === t.id).length;
+      return `<button class="tab" role="tab" type="button" data-tab="${t.id}" aria-selected="${t.id === state.tab}">${t.label}<span class="n">${n}</span></button>`;
+    }).join('');
+    $('platforms').innerHTML = PLATFORMS.map(p => `<button class="chip" type="button" data-platform="${p.id}" aria-pressed="${p.id === state.platform}">${p.label}</button>`).join('');
+    $('sort').value = state.sort;
+    $('sort').disabled = state.tab === 'next';
+  }
+
+  function badges(g) {
+    const out = [];
+    if (g.family) out.push('<span class="badge family">FAMILIA</span>');
+    else if (g.platform === 'steam') out.push('<span class="badge">STEAM</span>');
+    if (g.platform === 'xbox') out.push('<span class="badge xbox">XBOX</span>');
+    if (g.platform === 'gamepass') out.push('<span class="badge xbox">GAME PASS</span>');
+    if (g.needsInfo) out.push('<span class="badge pending" title="Duración y notas pendientes de la próxima sincronización">SIN DATOS</span>');
+    return out.join('');
+  }
+  function facts(g) {
+    const f = [];
+    if (num(g.mainHours) != null) f.push(`<span><b>~${fmtH(g.mainHours)}</b> historia${num(g.extrasHours) != null ? ' · ' + fmtH(g.extrasHours) + ' con extras' : ''}</span>`);
+    if (num(g.criticScore) != null) f.push(`<span>Crítica <b>${Math.round(g.criticScore)}</b></span>`);
+    if (num(g.steamPositive) != null) f.push(`<span>Steam <b>${g.steamPositive}%</b>${g.steamLabel ? ' · ' + esc(g.steamLabel) : ''}</span>`);
+    if (num(g.playtimeHours) != null && g.playtimeHours > 0) f.push(`<span>Jugado <b>${fmtH(g.playtimeHours)}</b></span>`);
+    if (g.genres && g.genres.length) f.push(`<span>${esc(g.genres.slice(0, 3).join(', '))}</span>`);
+    return f.join('');
+  }
+  function actions(g, i, total) {
+    const s = g.status || 'backlog';
+    const a = [];
+    if (!state.canWrite) return '';
+    if (s === 'next') {
+      a.push(`<button class="act icon" type="button" data-act="up" data-id="${esc(g.id)}" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button>`);
+      a.push(`<button class="act icon" type="button" data-act="down" data-id="${esc(g.id)}" aria-label="Bajar" ${i === total - 1 ? 'disabled' : ''}>↓</button>`);
+      a.push(`<button class="act go" type="button" data-act="playing" data-id="${esc(g.id)}">Empezar</button>`);
+      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Quitar de la cola</button>`);
+    } else if (s === 'backlog') {
+      a.push(`<button class="act go" type="button" data-act="next" data-id="${esc(g.id)}">A la cola</button>`);
+      a.push(`<button class="act" type="button" data-act="playing" data-id="${esc(g.id)}">Jugando</button>`);
+      a.push(`<button class="act" type="button" data-act="finished" data-id="${esc(g.id)}">Terminado</button>`);
+      a.push(`<button class="act" type="button" data-act="evergreen" data-id="${esc(g.id)}" title="Juegos sin final: simuladores, multijugador…">Evergreen</button>`);
+      a.push(`<button class="act" type="button" data-act="hidden" data-id="${esc(g.id)}">Ocultar</button>`);
+    } else if (s === 'playing') {
+      a.push(`<button class="act go" type="button" data-act="finished" data-id="${esc(g.id)}">Terminado</button>`);
+      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Aparcar</button>`);
+    } else {
+      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">${s === 'hidden' ? 'Mostrar' : 'Volver al backlog'}</button>`);
+    }
+    a.push(`<button class="act" type="button" data-act="note" data-id="${esc(g.id)}">${g.notes ? 'Editar nota' : 'Nota'}</button>`);
+    return a.join('');
+  }
+
+  function renderList() {
+    const list = visible();
+    const el = $('list');
+    if (!state.games.length) {
+      el.innerHTML = `<div class="empty"><h2>Tu backlog está vacío</h2><p>Añade un juego con <b>+ Añadir juego</b>, o espera a la sincronización desde el Mac, que traerá tu biblioteca de Steam (también la de la familia) y Xbox con duración y notas.</p></div>`;
+      return;
+    }
+    if (!list.length) {
+      const msg = { next: 'Pon juegos en la cola desde el Backlog con <b>A la cola</b>.', playing: 'Marca como <b>Jugando</b> lo que tengas entre manos.', finished: 'Aquí irán los juegos que termines.', evergreen: 'Juegos sin final, como simuladores o multijugador: no cuentan como pendientes. Márcalos desde el Backlog con <b>Evergreen</b>.', hidden: 'Los juegos que ocultes aparecerán aquí.', backlog: 'Nada coincide con el filtro.' }[state.tab];
+      el.innerHTML = `<div class="empty"><h2>Nada por aquí</h2><p>${msg}</p></div>`;
+      return;
+    }
+    const isQueue = state.tab === 'next';
+    el.innerHTML = list.map((g, i) => `
+      <article class="row s-${esc(g.status || 'backlog')}" data-id="${esc(g.id)}">
+        <div class="pos ${isQueue ? (i < 3 ? 'top' : '') : 'none'}">${isQueue ? '#' + (i + 1) : ''}</div>
+        <div class="main">
+          <div class="title"><span class="name">${esc(g.name)}</span>${badges(g)}</div>
+          ${facts(g) ? `<div class="facts">${facts(g)}</div>` : ''}
+          ${g.notes && state.editing !== g.id ? `<div class="note">${esc(g.notes)}</div>` : ''}
+        </div>
+        <div class="actions">${actions(g, i, list.length)}</div>
+        ${state.editing === g.id ? `<div class="editor"><textarea id="note-${esc(g.id)}" aria-label="Nota para ${esc(g.name)}" placeholder="Por qué lo quieres jugar, con quién, en qué orden…">${esc(g.notes || '')}</textarea><button class="btn primary" type="button" data-act="save-note" data-id="${esc(g.id)}">Guardar</button></div>` : ''}
+      </article>`).join('');
+  }
+  function render() { renderHeader(); renderList(); }
+
+  function setStatus(text, isErr) { const s = $('status'); s.textContent = text || ''; s.classList.toggle('err', !!isErr); }
+  async function write(id, patch) {
+    if (!state.db) return;
+    try { await state.db.doc('games/' + id).update(Object.assign({ updatedAt: new Date().toISOString() }, patch)); setStatus(''); }
+    catch (e) { setStatus(e && e.code === 'quota_exceeded' ? 'La base de datos está llena: borra juegos ocultos que no necesites.' : 'No se pudo guardar el cambio. Vuelve a intentarlo.', true); }
+  }
+  function nextQueueOrder() { return state.games.filter(g => g.status === 'next').reduce((m, g) => Math.max(m, num(g.queueOrder) || 0), 0) + 1; }
+
+  document.addEventListener('click', async ev => {
+    const t = ev.target.closest('button');
+    if (!t) return;
+    if (t.dataset.tab) { state.tab = t.dataset.tab; state.editing = null; remember(); render(); return; }
+    if (t.dataset.platform) { state.platform = t.dataset.platform; remember(); render(); return; }
+    if (t.id === 'add-toggle') { const f = $('add-form'); f.hidden = !f.hidden; if (!f.hidden) $('add-name').focus(); return; }
+    const id = t.dataset.id, act = t.dataset.act;
+    if (!id || !act) return;
+    const g = state.games.find(x => x.id === id);
+    if (!g) return;
+    if (act === 'note') { state.editing = state.editing === id ? null : id; renderList(); const ta = $('note-' + id); if (ta) ta.focus(); return; }
+    if (act === 'save-note') { const ta = $('note-' + id); state.editing = null; await write(id, { notes: ta ? ta.value.trim() : '' }); return; }
+    if (act === 'up' || act === 'down') {
+      const q = visible(); const i = q.findIndex(x => x.id === id); const j = act === 'up' ? i - 1 : i + 1;
+      if (j < 0 || j >= q.length) return;
+      const a = num(q[i].queueOrder) ?? i + 1, b = num(q[j].queueOrder) ?? j + 1;
+      await write(q[i].id, { queueOrder: b }); await write(q[j].id, { queueOrder: a === b ? b + (act === 'up' ? 1 : -1) : a });
+      return;
+    }
+    const patch = { status: act };
+    if (act === 'next') patch.queueOrder = nextQueueOrder();
+    if (act === 'finished') patch.finishedAt = new Date().toISOString();
+    await write(id, patch);
+  });
+  $('q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
+  $('sort').addEventListener('change', e => { state.sort = e.target.value; remember(); renderList(); });
+  $('add-form').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const name = $('add-name').value.trim();
+    if (!name || !state.db) return;
+    const platform = $('add-platform').value;
+    const id = 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    try {
+      await state.db.doc('games/' + id).set({ name, platform, family: $('add-family').checked, status: 'backlog', source: 'manual', needsInfo: true, notes: '', addedAt: new Date().toISOString() });
+      $('add-name').value = ''; $('add-family').checked = false; setStatus('Añadido «' + name + '». La duración y las notas llegan con la próxima sincronización.');
+    } catch (e) { setStatus(e && e.code === 'quota_exceeded' ? 'La base de datos está llena.' : 'No se pudo añadir el juego. Vuelve a intentarlo.', true); }
+  });
+
+  render();
+
+  (async function connect() {
+    const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+    if (!db) { setStatus('Sin conexión con la base de datos: el backlog no se puede cargar aquí.', true); $('add-toggle').hidden = true; return; }
+    state.db = db;
+    const user = await window.claude.use('user');
+    state.canWrite = user ? (await user.canEdit()) : true;
+    $('add-toggle').hidden = !state.canWrite;
+    db.collection('games').onSnapshot(snap => {
+      state.games = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      render();
+    }, () => setStatus('Se perdió la conexión con la base de datos. Recarga la página.', true));
+    db.doc('meta/sync').onSnapshot(snap => { state.meta = snap.exists ? snap.data() : null; renderHeader(); });
+  })();
+})();
+</script>
