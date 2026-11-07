@@ -92,6 +92,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
 .row.s-next:hover { box-shadow: var(--glow); border-color: rgba(220,38,38,0.4); border-left-color: var(--red); }
 .row.s-playing { border-left-color: var(--blue); }
 .row.s-evergreen { border-left-color: var(--green); }
+.row.s-paused { border-left-color: var(--amber); }
 .row.s-playing:hover { box-shadow: var(--glow-blue); border-color: rgba(37,99,235,0.4); border-left-color: var(--blue); }
 .pos { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--muted); width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
 .pos.top { color: var(--red); }
@@ -141,7 +142,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
       <div class="sync" id="sync">Sin sincronizar todavía · los juegos se añaden a mano o con la sincronización desde el Mac</div>
     </div>
     <div class="totals" aria-live="polite">
-      <div class="total" title="Cola, backlog y jugando; los evergreen no cuentan"><b id="t-pending">0</b><span>Por jugar</span></div>
+      <div class="total" title="Cola, backlog, jugando y parados; los evergreen no cuentan"><b id="t-pending">0</b><span>Por jugar</span></div>
       <div class="total"><b id="t-hours">—</b><span>Horas de historia</span></div>
       <div class="total"><b id="t-finished">0</b><span>Terminados este año</span></div>
     </div>
@@ -185,6 +186,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     { id: 'next', label: 'A continuación' },
     { id: 'backlog', label: 'Backlog' },
     { id: 'playing', label: 'Jugando' },
+    { id: 'paused', label: 'Parados' },
     { id: 'evergreen', label: 'Evergreen' },
     { id: 'finished', label: 'Terminados' },
     { id: 'hidden', label: 'Ocultos' }
@@ -234,7 +236,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
   }
 
   function renderHeader() {
-    const pending = state.games.filter(g => ['next', 'backlog', 'playing'].includes(g.status || 'backlog'));
+    const pending = state.games.filter(g => ['next', 'backlog', 'playing', 'paused'].includes(g.status || 'backlog'));
     $('t-pending').textContent = pending.length;
     const hours = pending.reduce((s, g) => s + (num(g.mainHours) || 0), 0);
     const withHours = pending.filter(g => num(g.mainHours) != null).length;
@@ -285,12 +287,18 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     } else if (s === 'backlog') {
       a.push(`<button class="act go" type="button" data-act="next" data-id="${esc(g.id)}">A la cola</button>`);
       a.push(`<button class="act" type="button" data-act="playing" data-id="${esc(g.id)}">Jugando</button>`);
+      a.push(`<button class="act" type="button" data-act="paused" data-id="${esc(g.id)}" title="Empezado y dejado a medias">Parado</button>`);
       a.push(`<button class="act" type="button" data-act="finished" data-id="${esc(g.id)}">Terminado</button>`);
       a.push(`<button class="act" type="button" data-act="evergreen" data-id="${esc(g.id)}" title="Juegos sin final: simuladores, multijugador…">Evergreen</button>`);
       a.push(`<button class="act" type="button" data-act="hidden" data-id="${esc(g.id)}">Ocultar</button>`);
     } else if (s === 'playing') {
       a.push(`<button class="act go" type="button" data-act="finished" data-id="${esc(g.id)}">Terminado</button>`);
-      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Aparcar</button>`);
+      a.push(`<button class="act" type="button" data-act="paused" data-id="${esc(g.id)}" title="Lo has dejado a medias pero quieres volver">Parar</button>`);
+      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Al backlog</button>`);
+    } else if (s === 'paused') {
+      a.push(`<button class="act go" type="button" data-act="playing" data-id="${esc(g.id)}">Retomar</button>`);
+      a.push(`<button class="act" type="button" data-act="finished" data-id="${esc(g.id)}">Terminado</button>`);
+      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Al backlog</button>`);
     } else {
       a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">${s === 'hidden' ? 'Mostrar' : 'Volver al backlog'}</button>`);
     }
@@ -306,7 +314,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
       return;
     }
     if (!list.length) {
-      const msg = { next: 'Pon juegos en la cola desde el Backlog con <b>A la cola</b>.', playing: 'Marca como <b>Jugando</b> lo que tengas entre manos.', finished: 'Aquí irán los juegos que termines.', evergreen: 'Juegos sin final, como simuladores o multijugador: no cuentan como pendientes. Márcalos desde el Backlog con <b>Evergreen</b>.', hidden: 'Los juegos que ocultes aparecerán aquí.', backlog: 'Nada coincide con el filtro.' }[state.tab];
+      const msg = { next: 'Pon juegos en la cola desde el Backlog con <b>A la cola</b>.', playing: 'Marca como <b>Jugando</b> lo que tengas entre manos.', paused: 'Juegos empezados que has dejado pero quieres retomar. Márcalos desde Jugando con <b>Parar</b>.', finished: 'Aquí irán los juegos que termines.', evergreen: 'Juegos sin final, como simuladores o multijugador: no cuentan como pendientes. Márcalos desde el Backlog con <b>Evergreen</b>.', hidden: 'Los juegos que ocultes aparecerán aquí.', backlog: 'Nada coincide con el filtro.' }[state.tab];
       el.innerHTML = `<div class="empty"><h2>Nada por aquí</h2><p>${msg}</p></div>`;
       return;
     }
