@@ -147,22 +147,38 @@ def fetch_info(targets, cid, secret, cache):
         for row in igdb(cid, token, "external_games",
                         f"fields game,uid; where external_game_source = 1 & uid = ({chunk}); limit 500;"):
             ids.setdefault(steam[row["uid"]], row["game"])
+    def search(name):
+        rows = igdb(cid, token, "games", f'search "{name.replace(chr(34), "")}"; fields id; '
+                                         'where version_parent = null; limit 1;')
+        return rows[0]["id"] if rows else None
+
+    def lookup(idl):
+        details, ttb = {}, {}
+        for i in range(0, len(idl), 400):
+            lst = ",".join(map(str, idl[i:i + 400]))
+            for r in igdb(cid, token, "games", f"fields aggregated_rating,first_release_date,genres.name,game_modes.name; "
+                                              f"where id = ({lst}); limit 500;"):
+                details[r["id"]] = r
+            for r in igdb(cid, token, "game_time_to_beats",
+                          f"fields game_id,hastily,normally,completely; where game_id = ({lst}); limit 500;"):
+                ttb[r["game_id"]] = r
+        return details, ttb
+
     for k, t in todo.items():
-        if k not in ids:
-            name = t["name"].replace('"', "")
-            rows = igdb(cid, token, "games", f'search "{name}"; fields id; limit 1;')
-            if rows:
-                ids[k] = rows[0]["id"]
-    details, ttb = {}, {}
-    idl = list(set(ids.values()))
-    for i in range(0, len(idl), 400):
-        lst = ",".join(map(str, idl[i:i + 400]))
-        for r in igdb(cid, token, "games", f"fields aggregated_rating,first_release_date,genres.name,game_modes.name; "
-                                          f"where id = ({lst}); limit 500;"):
-            details[r["id"]] = r
-        for r in igdb(cid, token, "game_time_to_beats",
-                      f"fields game_id,hastily,normally,completely; where game_id = ({lst}); limit 500;"):
-            ttb[r["game_id"]] = r
+        if k not in ids and (gid := search(t["name"])):
+            ids[k] = gid
+    details, ttb = lookup(list(set(ids.values())))
+    # Editions ("GOTY", "Enhanced", "- Test Server"...) often match an IGDB record with no length or score:
+    # retry those with the cleaned base name and keep the result if it has data.
+    retry = {k: clean_name(t["name"]) for k, t in todo.items() if not NON_GAME.search(t["name"])
+             and not ttb.get(ids.get(k)) and not details.get(ids.get(k), {}).get("aggregated_rating")}
+    alt = {k: gid for k, n in retry.items() if (gid := search(n)) and gid != ids.get(k)}
+    d2, t2 = lookup(list(set(alt.values())))
+    for k, gid in alt.items():
+        if t2.get(gid) or d2.get(gid, {}).get("aggregated_rating"):
+            ids[k] = gid
+    details.update(d2)
+    ttb.update(t2)
     hours = lambda s: round(s / 3600, 1) if s else None
     for n, (k, t) in enumerate(todo.items(), 1):
         print(f"\r  Info {n}/{len(todo)}", end="", flush=True)
@@ -181,6 +197,19 @@ def fetch_info(targets, cid, secret, cache):
             info.update(steam_reviews(t["appid"]))
         cache[k] = info
     print()
+
+NON_GAME = re.compile(r"test server|\bPTS\b|playtest|public test|test client|\bdemo\b|sneak peek|non-game|"
+                      r"lossless scaling|controller companion|xbplay|aimlabs|deathmatch|\bmod:|^the lab$", re.I)
+
+EDITION_WORDS = (r"enhanced|remaster(ed)?|deluxe|goty|game of the year|edition|director'?s cut|complete|gold pack|"
+                 r"ultimate|special|definitive|collection|anniversary|master collection version|classic|steam")
+
+def clean_name(name):
+    """'Batman: Arkham Asylum GOTY Edition' -> 'Batman: Arkham Asylum'; drops ™®, (...) and '- Test Server'-style tails."""
+    s = re.sub(r"[™®]|\(.*?\)", "", name)
+    s = re.sub(r"\s+-\s+.*$", "", s)
+    s = re.sub(rf"\b({EDITION_WORDS})\b", "", s, flags=re.I)
+    return re.sub(r"\s+", " ", s).strip(" :-") or name
 
 # ---------- merge ----------
 
@@ -254,6 +283,10 @@ def main():
     finally:
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         CACHE.write_text(json.dumps(cache))
+    # Manual data (web searches) lives in overrides.json, keyed like the cache ("steam:<appid>" or "name:<norm>").
+    ovf = Path(__file__).with_name("overrides.json")
+    for key, o in (json.loads(ovf.read_text()) if ovf.exists() else {}).items():
+        cache[key] = {**cache.get(key, {}), **{k: v for k, v in o.items() if not k.startswith("_")}}
 
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     info_fields = ("mainHours", "extrasHours", "completionistHours", "criticScore", "steamPositive", "steamLabel",
@@ -293,7 +326,8 @@ def main():
             put("delete", old_id, None)
             stats["fusionados"] += 1
         else:
-            data.update(status="evergreen" if suggests_evergreen(info) else "backlog", addedAt=now, notes="")
+            data.update(status="hidden" if NON_GAME.search(g["name"]) else
+                        "evergreen" if suggests_evergreen(info) else "backlog", addedAt=now, notes="")
             put("set", did, data)
             stats["nuevos"] += 1
 

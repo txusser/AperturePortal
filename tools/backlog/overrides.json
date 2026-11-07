@@ -1,0 +1,265 @@
+{
+ "steam:35140": {
+  "_name": "Batman Arkham Asylum",
+  "mainHours": 11,
+  "extrasHours": 16.5,
+  "completionistHours": 25.5,
+  "criticScore": 91
+ },
+ "steam:1942280": {
+  "_name": "Brotato",
+  "mainHours": 4.5,
+  "extrasHours": 21.5,
+  "completionistHours": 53.5
+ },
+ "steam:1070580": {
+  "_name": "Drift86",
+  "mainHours": 3.3,
+  "criticScore": 30
+ },
+ "steam:11590": {
+  "_name": "Hospital Tycoon",
+  "criticScore": 51
+ },
+ "steam:12750": {
+  "_name": "GRID",
+  "mainHours": 20,
+  "extrasHours": 24,
+  "completionistHours": 34,
+  "criticScore": 87
+ },
+ "steam:2131640": {
+  "_name": "MGS2",
+  "mainHours": 10,
+  "criticScore": 96
+ },
+ "steam:2131680": {
+  "_name": "MG & MG2",
+  "mainHours": 10
+ },
+ "steam:2427430": {
+  "_name": "STALKER CoP",
+  "mainHours": 15,
+  "extrasHours": 24.5,
+  "completionistHours": 31.5,
+  "criticScore": 80
+ },
+ "steam:2366970": {
+  "_name": "Arco",
+  "mainHours": 11.5,
+  "extrasHours": 13,
+  "completionistHours": 15.5,
+  "criticScore": 89
+ },
+ "steam:1831830": {
+  "_name": "Chessarama",
+  "criticScore": 73
+ },
+ "steam:215830": {
+  "_name": "Closers",
+  "criticScore": 60
+ },
+ "steam:238430": {
+  "_name": "Contagion",
+  "criticScore": 62
+ },
+ "steam:244070": {
+  "_name": "Ace Patrol",
+  "criticScore": 71
+ },
+ "steam:244090": {
+  "_name": "Ace Patrol Pacific Skies",
+  "criticScore": 59
+ },
+ "steam:251530": {
+  "_name": "Anomaly Korea",
+  "mainHours": 3
+ },
+ "steam:294750": {
+  "_name": "Anomaly Defenders",
+  "criticScore": 70
+ },
+ "steam:3240220": {
+  "_name": "GTA V",
+  "mainHours": 32,
+  "extrasHours": 48,
+  "criticScore": 96
+ },
+ "steam:47810": {
+  "_name": "Dragon Age Origins",
+  "mainHours": 40.5,
+  "extrasHours": 58.5,
+  "completionistHours": 87.5,
+  "criticScore": 91
+ },
+ "steam:377840": {
+  "_name": "FF IX",
+  "mainHours": 38.5,
+  "extrasHours": 53,
+  "completionistHours": 82.5,
+  "criticScore": 94
+ },
+ "steam:2058180": {
+  "_name": "Judgment",
+  "mainHours": 25,
+  "criticScore": 82
+ },
+ "steam:2552450": {
+  "_name": "KH III + Re Mind",
+  "mainHours": 31,
+  "criticScore": 83
+ },
+ "steam:730820": {
+  "_name": "Curse of Monkey Island",
+  "mainHours": 8.5,
+  "criticScore": 89
+ },
+ "steam:3910": {
+  "_name": "Civ III Complete",
+  "criticScore": 90
+ },
+ "steam:375960": {
+  "_name": "PES 2016",
+  "criticScore": 83
+ },
+ "steam:46490": {
+  "_name": "Still Life 2",
+  "criticScore": 70
+ },
+ "steam:46550": {
+  "_name": "Post Mortem",
+  "criticScore": 71
+ },
+ "steam:46510": {
+  "_name": "Syberia 2",
+  "criticScore": 80
+ },
+ "steam:58560": {
+  "_name": "Runaway Twist of Fate",
+  "criticScore": 79
+ },
+ "steam:421050": {
+  "_name": "Deponia Doomsday",
+  "mainHours": 11,
+  "extrasHours": 12.5,
+  "completionistHours": 13.5,
+  "criticScore": 76
+ },
+ "steam:268540": {
+  "_name": "Whispered World SE",
+  "criticScore": 70
+ },
+ "steam:203830": {
+  "_name": "Chains of Satinav",
+  "mainHours": 10,
+  "extrasHours": 12,
+  "completionistHours": 13,
+  "criticScore": 75
+ },
+ "steam:314810": {
+  "_name": "Randal's Monday",
+  "criticScore": 57
+ },
+ "steam:359510": {
+  "_name": "Tangle Tower",
+  "mainHours": 5,
+  "criticScore": 74
+ },
+ "steam:441550": {
+  "_name": "SW Rebellion",
+  "criticScore": 62
+ },
+ "steam:566050": {
+  "_name": "Zeus + Poseidon",
+  "criticScore": 87
+ },
+ "steam:2950340": {
+  "_name": "LEGO HP Collection",
+  "mainHours": 24,
+  "criticScore": 73
+ },
+ "steam:841190": {
+  "_name": "Honey I Joined a Cult",
+  "criticScore": 72
+ },
+ "steam:1367300": {
+  "_name": "Blade Assault",
+  "criticScore": 59
+ },
+ "steam:703320": {
+  "_name": "Hidden & Dangerous 2",
+  "criticScore": 75
+ },
+ "steam:57600": {
+  "_name": "Tropico 3",
+  "criticScore": 79
+ },
+ "steam:7660": {
+  "_name": "X-COM Apocalypse",
+  "criticScore": 83
+ },
+ "steam:1847240": {
+  "_name": "Game Dev Story",
+  "mainHours": 7,
+  "extrasHours": 11,
+  "completionistHours": 15,
+  "criticScore": 86
+ },
+ "steam:34820": {
+  "_name": "Combat Wings BoB",
+  "criticScore": 70
+ },
+ "steam:369200": {
+  "_name": "GitS First Assault",
+  "criticScore": 60
+ },
+ "steam:1993180": {
+  "_name": "Quilts and Cats of Calico",
+  "criticScore": 80
+ },
+ "steam:1736290": {
+  "_name": "Crime O'Clock",
+  "mainHours": 12.5,
+  "extrasHours": 18.5,
+  "completionistHours": 20.5,
+  "criticScore": 73
+ },
+ "steam:1518220": {
+  "_name": "Spells & Secrets",
+  "mainHours": 11,
+  "extrasHours": 13,
+  "completionistHours": 16.5,
+  "criticScore": 70
+ },
+ "steam:361990": {
+  "_name": "Lakeview Cabin Collection",
+  "criticScore": 70
+ },
+ "steam:321270": {
+  "_name": "UNLOVED",
+  "criticScore": 65
+ },
+ "steam:2312520": {
+  "_name": "Everholm",
+  "criticScore": 72
+ },
+ "steam:481870": {
+  "_name": "Mini Thief",
+  "mainHours": 3
+ },
+ "steam:799510": {
+  "_name": "Squidlit",
+  "criticScore": 54
+ },
+ "steam:1609080": {
+  "_name": "Summer of '58",
+  "mainHours": 1.5
+ },
+ "steam:3218630": {
+  "_name": "Super Woden Rally Edge",
+  "mainHours": 10,
+  "extrasHours": 12,
+  "completionistHours": 13,
+  "criticScore": 76
+ }
+}
