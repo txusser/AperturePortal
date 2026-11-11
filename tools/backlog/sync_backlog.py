@@ -21,6 +21,9 @@ CACHE = Path.home() / ".cache/backlog-games/info.json"
 CACHE_DAYS = 30
 OC_CACHE = Path.home() / ".cache/backlog-games/opencritic.json"
 GRID_CACHE = Path.home() / ".cache/backlog-games/grids.json"
+# The artifact only shows images from its own asset store: covers are uploaded by Claude (Artifact asset upload)
+# and their "/_blob/<id>" urls kept here, keyed like the cache. Covers not uploaded yet are left in out/covers/.
+COVER_ASSETS = Path.home() / ".cache/backlog-games/cover-assets.json"
 OC_DAILY = 20  # RapidAPI free tier is small: look up a few games per sync, cached for good
 USER_FIELDS = ("status", "queueOrder", "notes", "finishedAt", "addedAt")
 EXIT_FAMILY_EXPIRED = 3
@@ -351,9 +354,19 @@ def main():
             steamgriddb(targets, grid_key, grids)
         finally:
             GRID_CACHE.write_text(json.dumps(grids))
-        for k, url in grids.items():
-            if url:
-                cache.setdefault(k, {})["coverUrl"] = url
+        assets = json.loads(COVER_ASSETS.read_text()) if COVER_ASSETS.exists() else {}
+        pending = {k: url for k, url in grids.items() if url and k in targets and k not in assets}
+        covers = WORK / "out/covers"
+        covers.mkdir(parents=True, exist_ok=True)
+        for old in covers.glob("*.jpg"):
+            old.unlink()
+        for k, url in pending.items():  # file name = cache key with ":" -> "~" ("steam~620.jpg")
+            req = urllib.request.Request(url, headers={"User-Agent": "backlog-sync/1.0"})
+            (covers / f"{k.replace(':', '~')}.jpg").write_bytes(urllib.request.urlopen(req, timeout=30).read())
+        if pending:
+            print(f"  {len(pending)} portadas nuevas en {covers}: súbelas al artefacto y añádelas a {COVER_ASSETS}")
+        for k, url in assets.items():
+            cache.setdefault(k, {})["coverUrl"] = url
     # Manual data (web searches) lives in overrides.json, keyed like the cache ("steam:<appid>" or "name:<norm>").
     ovf = Path(__file__).with_name("overrides.json")
     for key, o in (json.loads(ovf.read_text()) if ovf.exists() else {}).items():
