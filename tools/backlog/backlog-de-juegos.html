@@ -71,6 +71,7 @@ select:hover { border-color: var(--red); }
 .chip { background: var(--surface); border: 1px solid var(--line); color: var(--muted); padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; height: 28px; }
 .chip:hover { color: var(--fg); }
 .chip[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #FFFFFF; }
+.chip.replay[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #0A0A0A; }
 .btn { border-radius: 4px; height: 36px; padding: 0 16px; font-size: 14px; font-weight: 600; border: 1px solid var(--blue); background: transparent; color: var(--blue-text); transition: background 0.1s, box-shadow 0.15s; }
 .btn:hover { background: rgba(37,99,235,0.08); box-shadow: var(--glow-blue); }
 .btn.primary { background: var(--red); border-color: var(--red); color: #FFFFFF; }
@@ -86,17 +87,21 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
 
 /* List: dense rows; the queue is red-coded, "playing" blue-coded (one team colour per row). */
 .list { display: flex; flex-direction: column; gap: 4px; }
-.row { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 4px; padding: 10px 12px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; transition: border-color 0.1s, box-shadow 0.15s; }
+.row { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 4px; padding: 10px 12px; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 12px; align-items: center; transition: border-color 0.1s, box-shadow 0.15s; }
 .row:hover { border-color: #3A3A3A; background: var(--surface-2); }
 .row.s-next { border-left-color: var(--red); }
 .row.s-next:hover { box-shadow: var(--glow); border-color: rgba(220,38,38,0.4); border-left-color: var(--red); }
 .row.s-playing { border-left-color: var(--blue); }
 .row.s-evergreen { border-left-color: var(--green); }
 .row.s-paused { border-left-color: var(--amber); }
+.row.s-finished.replay { border-left-color: var(--amber); }
 .row.s-playing:hover { box-shadow: var(--glow-blue); border-color: rgba(37,99,235,0.4); border-left-color: var(--blue); }
 .pos { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--muted); width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
 .pos.top { color: var(--red); }
-.pos.none { width: 0; }
+.pos.none { width: 0; margin-right: -12px; }
+.cover { width: 54px; aspect-ratio: 2 / 3; border-radius: 3px; object-fit: cover; background: var(--surface-2); border: 1px solid var(--line); display: block; }
+.row:hover .cover { border-color: #3A3A3A; }
+.row.s-next:hover .cover { border-color: rgba(220,38,38,0.5); box-shadow: var(--glow-sm); }
 .main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
@@ -104,6 +109,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
 .badge.family { background: rgba(37,99,235,0.18); color: var(--blue-text); }
 .badge.xbox { background: rgba(34,197,94,0.14); color: var(--green); }
 .badge.pending { background: rgba(245,158,11,0.12); color: var(--amber); }
+.badge.replay { background: rgba(245,158,11,0.18); color: var(--amber); }
 .facts { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; color: var(--muted); }
 .facts b { font-family: var(--mono); color: var(--fg); font-weight: 700; font-variant-numeric: tabular-nums; }
 .prog { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -111,12 +117,24 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
 .prog .fill { height: 100%; background: var(--blue); }
 .row.s-paused .prog .fill { background: var(--amber); }
 .note { font-size: 12px; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.why { font-size: 12px; color: var(--blue-text); overflow-wrap: anywhere; }
+.why b { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; margin-right: 6px; color: var(--muted); }
+/* Personal rating: five star buttons; filled = amber. */
+.stars { display: flex; align-items: center; gap: 0; }
+.star { border: 0; background: transparent; padding: 0 2px; height: 24px; font-size: 16px; line-height: 1; color: #4A4A4A; }
+.star.on { color: var(--amber); text-shadow: 0 0 6px rgba(245,158,11,0.35); }
+.star:hover { color: var(--amber); }
+.stars:hover .star { color: var(--amber); }
+.stars .star:hover ~ .star { color: #4A4A4A; text-shadow: none; }
+.stars.ro .star { cursor: default; }
+.stars.ro:hover .star:not(.on), .stars.ro .star:hover ~ .star:not(.on) { color: #4A4A4A; }
 .actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .act { border: 0; background: transparent; border-radius: 4px; height: 28px; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; transition: background 0.1s; }
 .act:hover { background: var(--surface-2); color: var(--fg); }
 .row:hover .act:hover { background: #2A2A2A; }
 .act.go { background: var(--red); color: #FFFFFF; font-weight: 600; }
 .act.go:hover, .row:hover .act.go:hover { background: var(--red-hover); box-shadow: var(--glow-sm); }
+.act.replay-on { color: var(--amber); border: 1px solid rgba(245,158,11,0.5); }
 .row.s-playing .act.go { background: transparent; color: var(--blue-text); border: 1px solid var(--blue); }
 .row.s-playing .act.go:hover { background: rgba(37,99,235,0.08); box-shadow: var(--glow-blue); }
 .icon { font-family: var(--mono); padding: 0 8px; border: 1px solid var(--line); }
@@ -124,7 +142,8 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
 .editor textarea { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; resize: vertical; min-height: 40px; }
 .editor textarea:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,0.2); }
 @media (max-width: 640px) {
-  .row { grid-template-columns: auto minmax(0, 1fr); }
+  .row { grid-template-columns: auto auto minmax(0, 1fr); }
+  .cover { width: 44px; }
   .actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 
@@ -158,9 +177,11 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A3A3A3" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="Buscar juego" aria-label="Buscar juego"></label>
     <select id="sort" aria-label="Ordenar">
+      <option value="foryou">Para ti (Claude)</option>
       <option value="quick">Victorias rápidas</option>
       <option value="short">Más cortos</option>
       <option value="rated">Mejor valorados</option>
+      <option value="mine">Mi puntuación</option>
       <option value="recent">Añadidos recientemente</option>
       <option value="az">A–Z</option>
     </select>
@@ -199,11 +220,13 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     { id: 'all', label: 'Todos' }, { id: 'steam', label: 'Steam' }, { id: 'family', label: 'Familia' },
     { id: 'xbox', label: 'Xbox' }, { id: 'gamepass', label: 'Game Pass' }
   ];
-  const state = { games: [], meta: null, tab: 'backlog', platform: 'all', q: '', sort: 'quick', editing: null, db: null, canWrite: false };
+  // Statuses where a personal rating makes sense (you have played the game).
+  const RATEABLE = ['playing', 'paused', 'evergreen', 'finished'];
+  const state = { games: [], meta: null, recs: null, tab: 'backlog', platform: 'all', q: '', sort: 'quick', replayOnly: false, editing: null, db: null, canWrite: false };
 
-  try { const saved = JSON.parse(localStorage.getItem('backlog-view') || '{}'); Object.assign(state, pick(saved, ['tab', 'platform', 'sort'])); } catch (e) {}
+  try { const saved = JSON.parse(localStorage.getItem('backlog-view') || '{}'); Object.assign(state, pick(saved, ['tab', 'platform', 'sort', 'replayOnly'])); } catch (e) {}
   function pick(o, keys) { const r = {}; keys.forEach(k => { if (o && o[k]) r[k] = o[k]; }); return r; }
-  function remember() { try { localStorage.setItem('backlog-view', JSON.stringify({ tab: state.tab, platform: state.platform, sort: state.sort })); } catch (e) {} }
+  function remember() { try { localStorage.setItem('backlog-view', JSON.stringify({ tab: state.tab, platform: state.platform, sort: state.sort, replayOnly: state.replayOnly })); } catch (e) {} }
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -211,6 +234,7 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
   const fmtH = h => h == null ? null : (h < 10 ? h.toFixed(1).replace('.0', '') : Math.round(h)) + ' h';
 
   function rating(g) { return num(g.criticScore) ?? num(g.steamPositive); }
+  function rec(g) { return state.recs && state.recs.items ? state.recs.items[g.id] : null; }
   function quickScore(g) {
     const r = rating(g), h = num(g.mainHours);
     if (r == null || h == null) return -1;
@@ -228,15 +252,20 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
   function visible() {
     const q = state.q.trim().toLowerCase();
     let list = state.games.filter(g => (g.status || 'backlog') === state.tab && matchesPlatform(g) && (!q || (g.name || '').toLowerCase().includes(q)));
+    if (state.tab === 'finished' && state.replayOnly) list = list.filter(g => g.replay);
     if (state.tab === 'next') return list.sort((a, b) => (num(a.queueOrder) ?? 1e9) - (num(b.queueOrder) ?? 1e9));
     const by = {
+      foryou: (a, b) => ((rec(b) && num(rec(b).score)) ?? -1) - ((rec(a) && num(rec(a).score)) ?? -1),
       quick: (a, b) => quickScore(b) - quickScore(a),
       short: (a, b) => (num(a.mainHours) ?? 1e9) - (num(b.mainHours) ?? 1e9),
       rated: (a, b) => (rating(b) ?? -1) - (rating(a) ?? -1),
+      mine: (a, b) => (num(b.myRating) ?? -1) - (num(a.myRating) ?? -1),
       recent: (a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')),
       az: () => 0
     }[state.sort] || (() => 0);
-    return list.sort((a, b) => by(a, b) || (a.name || '').localeCompare(b.name || '', 'es'));
+    // In Terminados, games marked "Quiero volver" float to the top.
+    const replayFirst = state.tab === 'finished' ? (a, b) => (b.replay ? 1 : 0) - (a.replay ? 1 : 0) : () => 0;
+    return list.sort((a, b) => replayFirst(a, b) || by(a, b) || (a.name || '').localeCompare(b.name || '', 'es'));
   }
 
   function renderHeader() {
@@ -256,7 +285,12 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
       const n = state.games.filter(g => (g.status || 'backlog') === t.id).length;
       return `<button class="tab" role="tab" type="button" data-tab="${t.id}" aria-selected="${t.id === state.tab}">${t.label}<span class="n">${n}</span></button>`;
     }).join('');
-    $('platforms').innerHTML = PLATFORMS.map(p => `<button class="chip" type="button" data-platform="${p.id}" aria-pressed="${p.id === state.platform}">${p.label}</button>`).join('');
+    let chips = PLATFORMS.map(p => `<button class="chip" type="button" data-platform="${p.id}" aria-pressed="${p.id === state.platform}">${p.label}</button>`).join('');
+    if (state.tab === 'finished') {
+      const n = state.games.filter(g => g.status === 'finished' && g.replay).length;
+      chips += `<button class="chip replay" type="button" id="replay-only" aria-pressed="${state.replayOnly}">Quiero volver · ${n}</button>`;
+    }
+    $('platforms').innerHTML = chips;
     $('sort').value = state.sort;
     $('sort').disabled = state.tab === 'next';
   }
@@ -267,8 +301,19 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     else if (g.platform === 'steam') out.push('<span class="badge">STEAM</span>');
     if (g.platform === 'xbox') out.push('<span class="badge xbox">XBOX</span>');
     if (g.platform === 'gamepass') out.push('<span class="badge xbox">GAME PASS</span>');
+    if (g.replay && g.status === 'finished') out.push('<span class="badge replay">QUIERO VOLVER</span>');
     if (g.needsInfo) out.push('<span class="badge pending" title="Duración y notas pendientes de la próxima sincronización">SIN DATOS</span>');
     return out.join('');
+  }
+  function stars(g) {
+    if (!RATEABLE.includes(g.status)) return '';
+    const r = num(g.myRating) || 0;
+    if (!state.canWrite) {
+      if (!r) return '';
+      return `<div class="stars ro" aria-label="Tu puntuación: ${r} de 5">${[1, 2, 3, 4, 5].map(i => `<span class="star ${i <= r ? 'on' : ''}">★</span>`).join('')}</div>`;
+    }
+    return `<div class="stars" role="group" aria-label="Tu puntuación">${[1, 2, 3, 4, 5].map(i =>
+      `<button class="star ${i <= r ? 'on' : ''}" type="button" data-act="rate" data-val="${i}" data-id="${esc(g.id)}" aria-label="${i} estrella${i > 1 ? 's' : ''}${i === r ? ' (pulsa para quitar)' : ''}" aria-pressed="${i <= r}">★</button>`).join('')}</div>`;
   }
   function facts(g) {
     const f = [];
@@ -278,6 +323,11 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     if (num(g.playtimeHours) != null && g.playtimeHours > 0) f.push(`<span>Jugado <b>${fmtH(g.playtimeHours)}</b></span>`);
     if (g.genres && g.genres.length) f.push(`<span>${esc(g.genres.slice(0, 3).join(', '))}</span>`);
     return f.join('');
+  }
+  function why(g) {
+    if (state.sort !== 'foryou') return '';
+    const r = rec(g);
+    return r && r.why ? `<div class="why"><b>CLAUDE</b>${esc(r.why)}</div>` : '';
   }
   // Played hours vs story + extras (falls back to story only) for games in progress.
   function progress(g) {
@@ -311,6 +361,10 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
       a.push(`<button class="act go" type="button" data-act="playing" data-id="${esc(g.id)}">Retomar</button>`);
       a.push(`<button class="act" type="button" data-act="finished" data-id="${esc(g.id)}">Terminado</button>`);
       a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Al backlog</button>`);
+    } else if (s === 'finished') {
+      a.push(`<button class="act ${g.replay ? 'replay-on' : ''}" type="button" data-act="replay" data-id="${esc(g.id)}" aria-pressed="${!!g.replay}" title="Marca los que te gustaría rejugar">${g.replay ? '✓ Quiero volver' : 'Quiero volver'}</button>`);
+      a.push(`<button class="act" type="button" data-act="playing" data-id="${esc(g.id)}" title="Empezar a rejugarlo ya">Rejugar</button>`);
+      a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">Volver al backlog</button>`);
     } else {
       a.push(`<button class="act" type="button" data-act="backlog" data-id="${esc(g.id)}">${s === 'hidden' ? 'Mostrar' : 'Volver al backlog'}</button>`);
     }
@@ -326,17 +380,20 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
       return;
     }
     if (!list.length) {
-      const msg = { next: 'Pon juegos en la cola desde el Backlog con <b>A la cola</b>.', playing: 'Marca como <b>Jugando</b> lo que tengas entre manos.', paused: 'Juegos empezados que has dejado pero quieres retomar. Márcalos desde Jugando con <b>Parar</b>.', finished: 'Aquí irán los juegos que termines.', evergreen: 'Juegos sin final, como simuladores o multijugador: no cuentan como pendientes. Márcalos desde el Backlog con <b>Evergreen</b>.', hidden: 'Los juegos que ocultes aparecerán aquí.', backlog: 'Nada coincide con el filtro.' }[state.tab];
+      const msg = { next: 'Pon juegos en la cola desde el Backlog con <b>A la cola</b>.', playing: 'Marca como <b>Jugando</b> lo que tengas entre manos.', paused: 'Juegos empezados que has dejado pero quieres retomar. Márcalos desde Jugando con <b>Parar</b>.', finished: state.replayOnly ? 'Marca con <b>Quiero volver</b> los terminados que te gustaría rejugar.' : 'Aquí irán los juegos que termines.', evergreen: 'Juegos sin final, como simuladores o multijugador: no cuentan como pendientes. Márcalos desde el Backlog con <b>Evergreen</b>.', hidden: 'Los juegos que ocultes aparecerán aquí.', backlog: 'Nada coincide con el filtro.' }[state.tab];
       el.innerHTML = `<div class="empty"><h2>Nada por aquí</h2><p>${msg}</p></div>`;
       return;
     }
     const isQueue = state.tab === 'next';
     el.innerHTML = list.map((g, i) => `
-      <article class="row s-${esc(g.status || 'backlog')}" data-id="${esc(g.id)}">
+      <article class="row s-${esc(g.status || 'backlog')}${g.replay ? ' replay' : ''}" data-id="${esc(g.id)}">
         <div class="pos ${isQueue ? (i < 3 ? 'top' : '') : 'none'}">${isQueue ? '#' + (i + 1) : ''}</div>
+        ${g.coverUrl ? `<img class="cover" src="${esc(g.coverUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<div class="cover" aria-hidden="true"></div>'}
         <div class="main">
           <div class="title"><span class="name">${esc(g.name)}</span>${badges(g)}</div>
+          ${stars(g)}
           ${facts(g) ? `<div class="facts">${facts(g)}</div>` : ''}
+          ${why(g)}
           ${progress(g)}
           ${g.notes && state.editing !== g.id ? `<div class="note">${esc(g.notes)}</div>` : ''}
         </div>
@@ -344,12 +401,18 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
         ${state.editing === g.id ? `<div class="editor"><textarea id="note-${esc(g.id)}" aria-label="Nota para ${esc(g.name)}" placeholder="Por qué lo quieres jugar, con quién, en qué orden…">${esc(g.notes || '')}</textarea><button class="btn primary" type="button" data-act="save-note" data-id="${esc(g.id)}">Guardar</button></div>` : ''}
       </article>`).join('');
   }
-  function render() { renderHeader(); renderList(); }
+  function render() { renderHeader(); renderList(); recStatus(); }
+  function recStatus() {
+    if (state.sort !== 'foryou' || state.tab === 'next') return;
+    if (!state.recs || !state.recs.items) { setStatus('Claude aún no ha calculado recomendaciones. Pídeselas en una sesión: «actualiza las recomendaciones del backlog».'); return; }
+    const d = state.recs.updatedAt ? new Date(state.recs.updatedAt).toLocaleDateString('es-ES', { dateStyle: 'medium' }) : '';
+    setStatus('Orden de Claude' + (d ? ' del ' + d : '') + (state.recs.basis ? ' · ' + state.recs.basis : '') + '. Puntúa juegos con estrellas para afinarlo.');
+  }
 
   function setStatus(text, isErr) { const s = $('status'); s.textContent = text || ''; s.classList.toggle('err', !!isErr); }
   async function write(id, patch) {
     if (!state.db) return;
-    try { await state.db.doc('games/' + id).update(Object.assign({ updatedAt: new Date().toISOString() }, patch)); setStatus(''); }
+    try { await state.db.doc('games/' + id).update(Object.assign({ updatedAt: new Date().toISOString() }, patch)); recStatus(); if (state.sort !== 'foryou') setStatus(''); }
     catch (e) { setStatus(e && e.code === 'quota_exceeded' ? 'La base de datos está llena: borra juegos ocultos que no necesites.' : 'No se pudo guardar el cambio. Vuelve a intentarlo.', true); }
   }
   function nextQueueOrder() { return state.games.filter(g => g.status === 'next').reduce((m, g) => Math.max(m, num(g.queueOrder) || 0), 0) + 1; }
@@ -357,8 +420,9 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
   document.addEventListener('click', async ev => {
     const t = ev.target.closest('button');
     if (!t) return;
-    if (t.dataset.tab) { state.tab = t.dataset.tab; state.editing = null; remember(); render(); return; }
+    if (t.dataset.tab) { state.tab = t.dataset.tab; state.editing = null; setStatus(''); remember(); render(); return; }
     if (t.dataset.platform) { state.platform = t.dataset.platform; remember(); render(); return; }
+    if (t.id === 'replay-only') { state.replayOnly = !state.replayOnly; remember(); render(); return; }
     if (t.id === 'add-toggle') { const f = $('add-form'); f.hidden = !f.hidden; if (!f.hidden) $('add-name').focus(); return; }
     const id = t.dataset.id, act = t.dataset.act;
     if (!id || !act) return;
@@ -366,6 +430,8 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     if (!g) return;
     if (act === 'note') { state.editing = state.editing === id ? null : id; renderList(); const ta = $('note-' + id); if (ta) ta.focus(); return; }
     if (act === 'save-note') { const ta = $('note-' + id); state.editing = null; await write(id, { notes: ta ? ta.value.trim() : '' }); return; }
+    if (act === 'rate') { const v = Number(t.dataset.val); await write(id, { myRating: num(g.myRating) === v ? null : v, ratedAt: new Date().toISOString() }); return; }
+    if (act === 'replay') { await write(id, { replay: !g.replay }); return; }
     if (act === 'up' || act === 'down') {
       const q = visible(); const i = q.findIndex(x => x.id === id); const j = act === 'up' ? i - 1 : i + 1;
       if (j < 0 || j >= q.length) return;
@@ -376,10 +442,11 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
     const patch = { status: act };
     if (act === 'next') patch.queueOrder = nextQueueOrder();
     if (act === 'finished') patch.finishedAt = new Date().toISOString();
+    if (act === 'playing' && g.status === 'finished') patch.replay = false;  // replaying now: the wish is fulfilled
     await write(id, patch);
   });
   $('q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
-  $('sort').addEventListener('change', e => { state.sort = e.target.value; remember(); renderList(); });
+  $('sort').addEventListener('change', e => { state.sort = e.target.value; remember(); setStatus(''); render(); });
   $('add-form').addEventListener('submit', async ev => {
     ev.preventDefault();
     const name = $('add-name').value.trim();
@@ -406,6 +473,8 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
       render();
     }, () => setStatus('Se perdió la conexión con la base de datos. Recarga la página.', true));
     db.doc('meta/sync').onSnapshot(snap => { state.meta = snap.exists ? snap.data() : null; renderHeader(); });
+    // Recommendations: one doc written by Claude in a session — { updatedAt, basis, items: { <gameId>: { score, why } } }.
+    db.doc('meta/recs').onSnapshot(snap => { state.recs = snap.exists ? snap.data() : null; render(); });
   })();
 })();
 </script>

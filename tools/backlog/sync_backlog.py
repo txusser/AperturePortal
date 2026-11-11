@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB, OpenCritic and Steam reviews.
+"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB, OpenCritic, SteamGridDB and Steam reviews.
 
 The artifact database is only writable through Claude Code's ArtifactData tool, so a sync is:
   1. Claude exports `games` to <work>/export/games/*.json and the versions to <work>/export/versions.json
@@ -20,6 +20,7 @@ WORK = Path(os.environ.get("BACKLOG_WORK", Path.home() / "Work/tools/backlog-gam
 CACHE = Path.home() / ".cache/backlog-games/info.json"
 CACHE_DAYS = 30
 OC_CACHE = Path.home() / ".cache/backlog-games/opencritic.json"
+GRID_CACHE = Path.home() / ".cache/backlog-games/grids.json"
 OC_DAILY = 20  # RapidAPI free tier is small: look up a few games per sync, cached for good
 USER_FIELDS = ("status", "queueOrder", "notes", "finishedAt", "addedAt")
 EXIT_FAMILY_EXPIRED = 3
@@ -226,6 +227,30 @@ def opencritic(targets, key, cache, budget):
     if todo:
         print()
 
+def steamgriddb(targets, key, cache):
+    """Fill cache[key] = cover thumbnail URL (600x900 grid) or None, for every uncached target."""
+    hdr = {"Authorization": f"Bearer {key}"}
+    api = lambda path: http_json(f"https://www.steamgriddb.com/api/v2/{path}", headers=hdr).get("data") or []
+    todo = [(k, t) for k, t in targets.items() if k not in cache and not NON_GAME.search(t["name"])]
+    for n, (k, t) in enumerate(todo, 1):
+        print(f"\r  Portadas {n}/{len(todo)}", end="", flush=True)
+        try:
+            if t.get("appid"):
+                grids = api(f"grids/steam/{t['appid']}?dimensions=600x900&types=static&limit=1")
+            else:
+                hits = api("search/autocomplete/" + urllib.parse.quote(clean_name(t["name"]), safe=""))
+                grids = api(f"grids/game/{hits[0]['id']}?dimensions=600x900&types=static&limit=1") if hits else []
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                print("\n  SteamGridDB rechazó la clave.")
+                break
+            if e.code != 404:  # 404: SteamGridDB doesn't know the game
+                raise
+            grids = []
+        cache[k] = grids[0]["thumb"] if grids else None
+    if todo:
+        print()
+
 NON_GAME = re.compile(r"test server|\bPTS\b|playtest|public test|test client|\bdemo\b|sneak peek|non-game|"
                       r"lossless scaling|controller companion|xbplay|aimlabs|deathmatch|\bmod:|^the lab$", re.I)
 
@@ -320,6 +345,15 @@ def main():
         for k, o in oc.items():  # OpenCritic wins over IGDB's aggregated rating when it has a score
             if o.get("score") and k in cache:
                 cache[k]["criticScore"] = o["score"]
+    if grid_key := kc_get("steamgriddb_key"):
+        grids = json.loads(GRID_CACHE.read_text()) if GRID_CACHE.exists() else {}
+        try:
+            steamgriddb(targets, grid_key, grids)
+        finally:
+            GRID_CACHE.write_text(json.dumps(grids))
+        for k, url in grids.items():
+            if url:
+                cache.setdefault(k, {})["coverUrl"] = url
     # Manual data (web searches) lives in overrides.json, keyed like the cache ("steam:<appid>" or "name:<norm>").
     ovf = Path(__file__).with_name("overrides.json")
     for key, o in (json.loads(ovf.read_text()) if ovf.exists() else {}).items():
@@ -327,7 +361,7 @@ def main():
 
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     info_fields = ("mainHours", "extrasHours", "completionistHours", "criticScore", "steamPositive", "steamLabel",
-                   "genres", "releaseYear")
+                   "genres", "releaseYear", "coverUrl")
     writes, stats = [], {"nuevos": 0, "actualizados": 0, "fusionados": 0, "solo_info": 0, "sin_cambios": 0}
 
     def put_changes(did, data, stat):
