@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB and Steam reviews.
+"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB, OpenCritic and Steam reviews.
 
 The artifact database is only writable through Claude Code's ArtifactData tool, so a sync is:
   1. Claude exports `games` to <work>/export/games/*.json and the versions to <work>/export/versions.json
@@ -19,6 +19,8 @@ SERVICE = "backlog-games"
 WORK = Path(os.environ.get("BACKLOG_WORK", Path.home() / "Work/tools/backlog-games"))
 CACHE = Path.home() / ".cache/backlog-games/info.json"
 CACHE_DAYS = 30
+OC_CACHE = Path.home() / ".cache/backlog-games/opencritic.json"
+OC_DAILY = 20  # RapidAPI free tier is small: look up a few games per sync, cached for good
 USER_FIELDS = ("status", "queueOrder", "notes", "finishedAt", "addedAt")
 EXIT_FAMILY_EXPIRED = 3
 
@@ -44,7 +46,8 @@ def ask_family_cookie():
 
 def setup():
     for name, label, secret in [("steam_id", "SteamID64", False), ("steam_key", "Steam Web API key", True),
-                                ("twitch_id", "Twitch Client ID", False), ("twitch_secret", "Twitch Client Secret", True)]:
+                                ("twitch_id", "Twitch Client ID", False), ("twitch_secret", "Twitch Client Secret", True),
+                                ("opencritic_key", "OpenCritic RapidAPI key (opcional)", True)]:
         cur = kc_get(name)
         value = (getpass.getpass if secret else input)(f"{label}{' [ya guardado, Enter para mantener]' if cur else ''}: ").strip()
         if value:
@@ -203,6 +206,26 @@ def fetch_info(targets, cid, secret, cache):
         cache[k] = info
     print()
 
+def opencritic(targets, key, cache, budget):
+    """Fill cache[key] = {"score": int|None, "id": int|None} for up to `budget` uncached targets (2 calls each)."""
+    hdr = {"X-RapidAPI-Key": key, "X-RapidAPI-Host": "opencritic-api.p.rapidapi.com"}
+    api = lambda path: http_json(f"https://opencritic-api.p.rapidapi.com/{path}", headers=hdr)
+    todo = [(k, t) for k, t in targets.items() if k not in cache and not NON_GAME.search(t["name"])][:budget]
+    for n, (k, t) in enumerate(todo, 1):
+        print(f"\r  OpenCritic {n}/{len(todo)}", end="", flush=True)
+        try:
+            hits = api("game/search?" + urllib.parse.urlencode({"criteria": clean_name(t["name"])}))
+            hit = hits[0] if hits and hits[0].get("dist", 1) <= 0.2 else None  # dist: 0 = exact name
+            score = api(f"game/{hit['id']}").get("topCriticScore") if hit else None
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 429):
+                print(f"\n  OpenCritic paró ({e.code}): {'clave rechazada' if e.code != 429 else 'cupo agotado'}.")
+                break
+            raise
+        cache[k] = {"id": hit and hit["id"], "score": round(score) if score and score > 0 else None}
+    if todo:
+        print()
+
 NON_GAME = re.compile(r"test server|\bPTS\b|playtest|public test|test client|\bdemo\b|sneak peek|non-game|"
                       r"lossless scaling|controller companion|xbplay|aimlabs|deathmatch|\bmod:|^the lab$", re.I)
 
@@ -288,6 +311,15 @@ def main():
     finally:
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         CACHE.write_text(json.dumps(cache))
+    if oc_key := kc_get("opencritic_key"):
+        oc = json.loads(OC_CACHE.read_text()) if OC_CACHE.exists() else {}
+        try:
+            opencritic(targets, oc_key, oc, OC_DAILY)
+        finally:
+            OC_CACHE.write_text(json.dumps(oc))
+        for k, o in oc.items():  # OpenCritic wins over IGDB's aggregated rating when it has a score
+            if o.get("score") and k in cache:
+                cache[k]["criticScore"] = o["score"]
     # Manual data (web searches) lives in overrides.json, keyed like the cache ("steam:<appid>" or "name:<norm>").
     ovf = Path(__file__).with_name("overrides.json")
     for key, o in (json.loads(ovf.read_text()) if ovf.exists() else {}).items():
