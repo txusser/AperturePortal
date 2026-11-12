@@ -360,9 +360,9 @@ def main():
         covers.mkdir(parents=True, exist_ok=True)
         for old in covers.glob("*.jpg"):
             old.unlink()
-        for k, url in pending.items():  # file name = cache key with ":" -> "~" ("steam~620.jpg")
+        for k, url in pending.items():  # file name = cache key with ":" -> "-" ("steam-620.jpg")
             req = urllib.request.Request(url, headers={"User-Agent": "backlog-sync/1.0"})
-            (covers / f"{k.replace(':', '~')}.jpg").write_bytes(urllib.request.urlopen(req, timeout=30).read())
+            (covers / f"{k.replace(':', '-')}.jpg").write_bytes(urllib.request.urlopen(req, timeout=30).read())
         if pending:
             print(f"  {len(pending)} portadas nuevas en {covers}: súbelas al artefacto y añádelas a {COVER_ASSETS}")
         for k, url in assets.items():
