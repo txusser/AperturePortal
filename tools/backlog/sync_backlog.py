@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB, OpenCritic, SteamGridDB and Steam reviews.
+"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB, HowLongToBeat (opt-in), OpenCritic, SteamGridDB and Steam reviews.
 
 The artifact database is only writable through Claude Code's ArtifactData tool, so a sync is:
   1. Claude exports `games` to <work>/export/games/*.json and the versions to <work>/export/versions.json
@@ -20,6 +20,7 @@ WORK = Path(os.environ.get("BACKLOG_WORK", Path.home() / "Work/tools/backlog-gam
 CACHE = Path.home() / ".cache/backlog-games/info.json"
 CACHE_DAYS = 30
 OC_CACHE = Path.home() / ".cache/backlog-games/opencritic.json"
+HLTB_CACHE = Path.home() / ".cache/backlog-games/hltb.json"
 GRID_CACHE = Path.home() / ".cache/backlog-games/grids.json"
 # The artifact only shows images from its own asset store: covers are uploaded by Claude (Artifact asset upload)
 # and their "/_blob/<id>" urls kept here, keyed like the cache. Covers not uploaded yet are left in out/covers/.
@@ -254,6 +255,30 @@ def steamgriddb(targets, key, cache):
     if todo:
         print()
 
+def hltb(targets, cache):
+    """--hltb only, run by the user: fill cache[key] = {mainHours, extrasHours, completionistHours} or {} via the
+    community library howlongtobeatpy (HLTB has no public API; the library uses its site search)."""
+    try:
+        from howlongtobeatpy import HowLongToBeat
+    except ImportError:
+        sys.exit("Falta la librería: pip install howlongtobeatpy")
+    todo = [(k, t) for k, t in targets.items() if k not in cache and not NON_GAME.search(t["name"])]
+    for n, (k, t) in enumerate(todo, 1):
+        print(f"\r  HowLongToBeat {n}/{len(todo)}", end="", flush=True)
+        try:
+            hits = HowLongToBeat().search(clean_name(t["name"])) or []
+        except Exception as e:  # site change, block or network: keep what we have and stop
+            print(f"\n  HowLongToBeat falló ({e}); se guarda lo obtenido hasta ahora.")
+            break
+        best = max(hits, key=lambda h: h.similarity, default=None)
+        hours = lambda v: round(v, 1) if v else None
+        cache[k] = {} if not best or best.similarity < 0.8 else clean(
+            {"mainHours": hours(best.main_story), "extrasHours": hours(best.main_extra),
+             "completionistHours": hours(best.completionist)})
+        time.sleep(0.5)
+    if todo:
+        print()
+
 NON_GAME = re.compile(r"test server|\bPTS\b|playtest|public test|test client|\bdemo\b|sneak peek|non-game|"
                       r"lossless scaling|controller companion|xbplay|aimlabs|deathmatch|\bmod:|^the lab$", re.I)
 
@@ -288,6 +313,7 @@ def main():
     ap.add_argument("--family-login", action="store_true", help="volver a pegar la cookie de Steam (interactivo)")
     ap.add_argument("--no-family", action="store_true", help="saltar Steam Family")
     ap.add_argument("--limit", type=int, help="solo los N juegos de Steam con más horas (para probar)")
+    ap.add_argument("--hltb", action="store_true", help="pedir duraciones a HowLongToBeat (pip install howlongtobeatpy)")
     ap.add_argument("--dry-run", action="store_true", help="mostrar el resumen sin escribir lotes")
     a = ap.parse_args()
     if a.setup:
@@ -339,6 +365,15 @@ def main():
     finally:
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         CACHE.write_text(json.dumps(cache))
+    hl = json.loads(HLTB_CACHE.read_text()) if HLTB_CACHE.exists() else {}
+    if a.hltb:
+        try:
+            hltb(targets, hl)
+        finally:
+            HLTB_CACHE.write_text(json.dumps(hl))
+    for k, h in hl.items():  # HLTB lengths win over IGDB's, even on later syncs without --hltb
+        if h and k in cache:
+            cache[k].update(h)
     if oc_key := kc_get("opencritic_key"):
         oc = json.loads(OC_CACHE.read_text()) if OC_CACHE.exists() else {}
         try:
