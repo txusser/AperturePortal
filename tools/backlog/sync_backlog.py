@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Sync the "Backlog de juegos" artifact from Steam, Steam Family, IGDB, HowLongToBeat (opt-in), OpenCritic, SteamGridDB and Steam reviews.
+"""Sync the local "Backlog de juegos" from Steam, Steam Family, IGDB, HowLongToBeat (opt-in), OpenCritic,
+SteamGridDB and Steam reviews.
 
-The artifact database is only writable through Claude Code's ArtifactData tool, so a sync is:
-  1. Claude exports `games` to <work>/export/games/*.json and the versions to <work>/export/versions.json
-  2. this script fetches the sources, merges and writes batches to <work>/out/batch-NN.json
-  3. Claude applies each batch with ArtifactData (if_version pinned) and then meta/sync.
+Data lives in <work>/data: games.json ({id: game}), meta.json ({sync, recs}) and covers/<id>.jpg.
+serve.py serves the page and saves what you change there into the same games.json; this script only
+touches the synced fields and re-reads the file just before saving, so edits made meanwhile survive.
 
 Keys live in the macOS keychain (service "backlog-games"); run `--setup` once in a terminal.
 Python 3 standard library only.
@@ -22,9 +22,7 @@ CACHE_DAYS = 30
 OC_CACHE = Path.home() / ".cache/backlog-games/opencritic.json"
 HLTB_CACHE = Path.home() / ".cache/backlog-games/hltb.json"
 GRID_CACHE = Path.home() / ".cache/backlog-games/grids.json"
-# The artifact only shows images from its own asset store: covers are uploaded by Claude (Artifact asset upload)
-# and their "/_blob/<id>" urls kept here, keyed like the cache. Covers not uploaded yet are left in out/covers/.
-COVER_ASSETS = Path.home() / ".cache/backlog-games/cover-assets.json"
+DATA = WORK / "data"
 OC_DAILY = 20  # RapidAPI free tier is small: look up a few games per sync, cached for good
 USER_FIELDS = ("status", "queueOrder", "notes", "finishedAt", "addedAt")
 EXIT_FAMILY_EXPIRED = 3
@@ -325,10 +323,8 @@ def main():
     if not all(keys.values()):
         sys.exit("Faltan claves en el llavero: ejecuta `python3 sync_backlog.py --setup` en una terminal.")
 
-    export = WORK / "export"
-    existing = {p.stem: json.loads(p.read_text()) for p in (export / "games").glob("*.json")}
-    vfile = export / "versions.json"
-    versions = json.loads(vfile.read_text()) if vfile.exists() else {}
+    games_file = DATA / "games.json"
+    existing = json.loads(games_file.read_text()) if games_file.exists() else {}
 
     print("Steam: biblioteca…")
     steam = sorted(steam_owned(keys["steam_id"], keys["steam_key"]), key=lambda g: -g["playtimeHours"])
@@ -352,6 +348,7 @@ def main():
 
     # Non-Steam docs that still need info (seeds, manual, unmatched) are looked up by name.
     by_norm = {norm(g["name"]): did for did, g in existing.items() if not did.startswith("steam-")}
+    doc_of = lambda k: "steam-" + k[6:] if k.startswith("steam:") else by_norm.get(k[5:])
     synced_norms = {norm(g["name"]) for g in synced}
     targets = {f"steam:{g['appid']}": {"appid": g["appid"], "name": g["name"]} for g in synced}
     for did, g in existing.items():
@@ -389,19 +386,16 @@ def main():
             steamgriddb(targets, grid_key, grids)
         finally:
             GRID_CACHE.write_text(json.dumps(grids))
-        assets = json.loads(COVER_ASSETS.read_text()) if COVER_ASSETS.exists() else {}
-        pending = {k: url for k, url in grids.items() if url and k in targets and k not in assets}
-        covers = WORK / "out/covers"
+        covers = DATA / "covers"
         covers.mkdir(parents=True, exist_ok=True)
-        for old in covers.glob("*.jpg"):
-            old.unlink()
-        for k, url in pending.items():  # file name = cache key with ":" -> "-" ("steam-620.jpg")
-            req = urllib.request.Request(url, headers={"User-Agent": "backlog-sync/1.0"})
-            (covers / f"{k.replace(':', '-')}.jpg").write_bytes(urllib.request.urlopen(req, timeout=30).read())
-        if pending:
-            print(f"  {len(pending)} portadas nuevas en {covers}: súbelas al artefacto y añádelas a {COVER_ASSETS}")
-        for k, url in assets.items():
-            cache.setdefault(k, {})["coverUrl"] = url
+        for k, url in grids.items():
+            if not url or k not in targets or not (did := doc_of(k)):
+                continue
+            path = covers / f"{did}.jpg"
+            if not path.exists():
+                req = urllib.request.Request(url, headers={"User-Agent": "backlog-sync/1.0"})
+                path.write_bytes(urllib.request.urlopen(req, timeout=30).read())
+            cache.setdefault(k, {})["coverUrl"] = f"covers/{did}.jpg"
     # Manual data (web searches) lives in overrides.json, keyed like the cache ("steam:<appid>" or "name:<norm>").
     ovf = Path(__file__).with_name("overrides.json")
     for key, o in (json.loads(ovf.read_text()) if ovf.exists() else {}).items():
@@ -413,19 +407,14 @@ def main():
     writes, stats = [], {"nuevos": 0, "actualizados": 0, "fusionados": 0, "solo_info": 0, "sin_cambios": 0}
 
     def put_changes(did, data, stat):
-        """Update only the fields that differ from the exported doc; skip it when nothing changed."""
+        """Update only the fields that differ from the stored game; skip it when nothing changed."""
         diff = {k: v for k, v in data.items() if existing[did].get(k) != v}
         if diff:
             put("update", did, diff)
         stats[stat if diff else "sin_cambios"] += 1
 
     def put(op, did, data):
-        e = {"op": op, "collection": "games", "doc_id": did}
-        if data is not None:
-            e["data"] = data
-        if did in versions:
-            e["if_version"] = versions[did]
-        writes.append(e)
+        writes.append({"op": op, "doc_id": did, "data": data})
 
     for g in synced:
         did = f"steam-{g['appid']}"
@@ -463,41 +452,33 @@ def main():
     for e in writes:
         if e["op"] != "update":
             print(f"  {e['op']:6} {e['doc_id']:40} {e.get('data', {}).get('name', '')} {e.get('data', {}).get('status', '')}")
-    unpinned = [e["doc_id"] for e in writes if e["doc_id"] in existing and "if_version" not in e]
-    if unpinned:
-        print(f"\nSin versión ({len(unpinned)}), leerlas antes de aplicar: {' '.join(unpinned)}")
     if a.dry_run:
         return
 
-    out = WORK / "out"
-    out.mkdir(exist_ok=True)
-    docs = out / "docs"
-    docs.mkdir(exist_ok=True)
-    for old in [*out.glob("*.json"), *docs.glob("*.json")]:
-        old.unlink()
-    for e in writes:  # ArtifactData reads each document from its own file (file_path)
-        if "data" in e:
-            path = docs / f"{e['doc_id']}.json"
-            path.write_text(json.dumps(e.pop("data"), ensure_ascii=False))
-            e["file_path"] = str(path)
-    # A merge's set + delete must land in the same batch: start a new one if the pair would straddle.
-    batches, cur = [], []
-    for i, e in enumerate(writes):
-        pair = e["op"] == "set" and i + 1 < len(writes) and writes[i + 1]["op"] == "delete"
-        if len(cur) + (2 if pair else 1) > 50:
-            batches.append(cur)
-            cur = []
-        cur.append(e)
-    if cur:
-        batches.append(cur)
-    for n, b in enumerate(batches, 1):
-        (out / f"batch-{n:02}.json").write_text(json.dumps(b, ensure_ascii=False))
+    # Re-read just before saving so edits made in the page during the sync are kept; synced fields win.
+    games = json.loads(games_file.read_text()) if games_file.exists() else {}
+    for e in writes:
+        if e["op"] == "delete":
+            games.pop(e["doc_id"], None)
+        elif e["op"] == "set":
+            games[e["doc_id"]] = e["data"]
+        else:
+            games.setdefault(e["doc_id"], {}).update(e["data"])
     total = len(steam) + len(family)
-    meta = {"lastSyncAt": now, "source": "Steam + " + family_note,
-            "counts": {"steam": len(steam), "family": len(family), "processed": len(synced), **stats},
-            "partial": bool(a.limit and len(synced) < total)}
-    (out / "meta-sync.json").write_text(json.dumps(meta, ensure_ascii=False))
-    print(f"\n{len(batches)} lote(s) en {out}")
+    meta_file = DATA / "meta.json"
+    meta = json.loads(meta_file.read_text()) if meta_file.exists() else {}
+    meta["sync"] = {"lastSyncAt": now, "source": "Steam + " + family_note,
+                    "counts": {"steam": len(steam), "family": len(family), "processed": len(synced), **stats},
+                    "partial": bool(a.limit and len(synced) < total)}
+    save_json(games_file, games)
+    save_json(meta_file, meta)
+    print(f"\nGuardado en {DATA}")
+
+def save_json(path, obj):
+    """Write via a temp file + rename so serve.py never reads a half-written file."""
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1))
+    tmp.replace(path)
 
 if __name__ == "__main__":
     main()

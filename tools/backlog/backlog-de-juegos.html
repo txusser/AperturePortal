@@ -1,5 +1,8 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Backlog de juegos</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
 <style>
@@ -29,6 +32,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -410,10 +414,18 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
   }
 
   function setStatus(text, isErr) { const s = $('status'); s.textContent = text || ''; s.classList.toggle('err', !!isErr); }
+  // serve.py merges the patch into data/games.json (null removes a field) and returns the saved game.
+  async function save(id, patch) {
+    const r = await fetch('/api/games/' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+    if (!r.ok) throw new Error(r.status);
+    const saved = Object.assign({ id }, await r.json());
+    const i = state.games.findIndex(g => g.id === id);
+    if (i >= 0) state.games[i] = saved; else state.games.push(saved);
+    render();
+  }
   async function write(id, patch) {
-    if (!state.db) return;
-    try { await state.db.doc('games/' + id).update(Object.assign({ updatedAt: new Date().toISOString() }, patch)); recStatus(); if (state.sort !== 'foryou') setStatus(''); }
-    catch (e) { setStatus(e && e.code === 'quota_exceeded' ? 'La base de datos está llena: borra juegos ocultos que no necesites.' : 'No se pudo guardar el cambio. Vuelve a intentarlo.', true); }
+    try { await save(id, Object.assign({ updatedAt: new Date().toISOString() }, patch)); recStatus(); if (state.sort !== 'foryou') setStatus(''); }
+    catch (e) { setStatus('No se pudo guardar el cambio: ¿sigue abierto serve.py?', true); }
   }
   function nextQueueOrder() { return state.games.filter(g => g.status === 'next').reduce((m, g) => Math.max(m, num(g.queueOrder) || 0), 0) + 1; }
 
@@ -450,31 +462,30 @@ form.add input[type=checkbox] { accent-color: var(--red); width: 16px; height: 1
   $('add-form').addEventListener('submit', async ev => {
     ev.preventDefault();
     const name = $('add-name').value.trim();
-    if (!name || !state.db) return;
+    if (!name) return;
     const platform = $('add-platform').value;
     const id = 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     try {
-      await state.db.doc('games/' + id).set({ name, platform, family: $('add-family').checked, status: 'backlog', source: 'manual', needsInfo: true, notes: '', addedAt: new Date().toISOString() });
+      await save(id, { name, platform, family: $('add-family').checked, status: 'backlog', source: 'manual', needsInfo: true, notes: '', addedAt: new Date().toISOString() });
       $('add-name').value = ''; $('add-family').checked = false; setStatus('Añadido «' + name + '». La duración y las notas llegan con la próxima sincronización.');
-    } catch (e) { setStatus(e && e.code === 'quota_exceeded' ? 'La base de datos está llena.' : 'No se pudo añadir el juego. Vuelve a intentarlo.', true); }
+    } catch (e) { setStatus('No se pudo añadir el juego: ¿sigue abierto serve.py?', true); }
   });
 
   render();
 
   (async function connect() {
-    const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
-    if (!db) { setStatus('Sin conexión con la base de datos: el backlog no se puede cargar aquí.', true); $('add-toggle').hidden = true; return; }
-    state.db = db;
-    const user = await window.claude.use('user');
-    state.canWrite = user ? (await user.canEdit()) : true;
-    $('add-toggle').hidden = !state.canWrite;
-    db.collection('games').onSnapshot(snap => {
-      state.games = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    try {
+      const [games, meta] = await Promise.all(['/api/games', '/api/meta'].map(u => fetch(u).then(r => r.json())));
+      state.games = Object.entries(games).map(([id, g]) => Object.assign({ id }, g));
+      state.meta = meta.sync || null;
+      // Recommendations, written by Claude on request: { updatedAt, basis, items: { <gameId>: { score, why } } }.
+      state.recs = meta.recs || null;
+      state.canWrite = true;
       render();
-    }, () => setStatus('Se perdió la conexión con la base de datos. Recarga la página.', true));
-    db.doc('meta/sync').onSnapshot(snap => { state.meta = snap.exists ? snap.data() : null; renderHeader(); });
-    // Recommendations: one doc written by Claude in a session — { updatedAt, basis, items: { <gameId>: { score, why } } }.
-    db.doc('meta/recs').onSnapshot(snap => { state.recs = snap.exists ? snap.data() : null; render(); });
+    } catch (e) {
+      setStatus('No se pudo cargar el backlog. Abre la página con `python3 serve.py`, no con doble clic.', true);
+      $('add-toggle').hidden = true;
+    }
   })();
 })();
 </script>
